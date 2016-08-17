@@ -25,7 +25,7 @@ This module aims to:
 
 Rather than map classes to classes, and have to write custom JSON, XML, etc encoders, this module attempts to do schema translation using python dicts, lists, etc as fundamental units of records, rows, and documents. There are many good existing implementations of QuakeML classes, including those distributed by quakeml.org, and the excellent ObsPy framework. Those or other custom classes can easily be built using the structures from this module. Being in pure python allows this lib to be used by other interpreters, i.e. pypy. Another goal of this project is to produce structures which can easily be serialized to other wire formats, i.e. JSON, msgpack, Avro, or Protocol Buffers.
 
-The core of this module has no external dependencies. Serialization to XML is done through the `xmltodict` module, which is included in this package. There are plugins (currently named the `aux` module), which do have external dependencies. For instance, serialization to XML is pure python, but the XSD schema validator currently depends on the `lxml` package (validating is highly recommended in production).
+The core of this module has no external dependencies. Serialization to XML is done through the `xmltodict` module, which is included in this package. There are `plugins`, which do have external dependencies. For instance, serialization to XML is pure python, but the XSD schema validator currently depends on the `lxml` package (validating is highly recommended in production).
 
 Description
 -----------
@@ -36,12 +36,12 @@ Core
 * `qmlutil.xml` - Serialize a python QML structure (dicts + lists) to XML/QuakeML
 
 Require other python libs
-* `qmlutil.aux.antelope` - Contains converter classes for Antelope CSS databases
-* `qmlutil.aux.xml` - Contains classes for more advanced XML tasks that require libxml2
+* `qmlutil.plugins.antelope` - Contains converter classes for Antelope CSS databases
+* `qmlutil.plugins.xml` - Contains classes for more advanced XML tasks that require libxml2
 
 Dependencies
 ------------
-There are no deps for core. The `aux` (change name to `plugins`) modules have various vendor reqs:
+There are no deps for core. The `plugins` modules have various vendor reqs:
 * The `antelope` plugin requires the proprietary `antelope` packages and NSL's `curds2` DBAPI driver
 * The `xml` plugin requires the `lxml` package
 

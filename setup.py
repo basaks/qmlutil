@@ -32,7 +32,7 @@ s_args = {
     'url': 'https//github.com/NVSeismoLab/qmlutil',
     'packages': [
         'qmlutil',
-        'qmlutil.aux',
+        'qmlutil.plugins',
         'qmlutil.css',
         'qmlutil.data',  # TODO: add static files IMPORTANT!!
         'qmlutil.lib',

@@ -15,5 +15,5 @@
 # limitations under the License.
 #
 """
-qmlutil.aux
+qmlutil.plugins
 """

@@ -41,11 +41,11 @@ CFG = dict(
 
 @integration
 def test_noprefor():
-    """Test case of orid/evid in origin not in event table""" 
+    """Test case of orid/evid in origin not in event table"""
     import logging
     from qmlutil import dumps, Rounder
-    from qmlutil.aux.xml import validate
-    from qmlutil.aux.antelope import Db2Quakeml
+    from qmlutil.plugins.xml import validate
+    from qmlutil.plugins.antelope import Db2Quakeml
     #from qmlutil.ichinose import IchinoseToQmlConverter
 
     # Preprocessor for XML serialization
@@ -57,14 +57,14 @@ def test_noprefor():
     evid = 540344
 
     # Convert and check for everything we asked for (ANSS, phases, etc)
-    logging.basicConfig() # config root logger TODO: change to mudule logger:
-    # 'qmlutil.aux.antelope'
+    logging.basicConfig() # config root logger TODO: change to module logger:
+    # 'qmlutil.plugins.antelope'
     conv = Db2Quakeml(**CFG)
     # ------------------------------------------------------------------------
     # Test event generation
     event = conv.get_event(dsn, orid, pick=True, focalMechanism=True, anss=True)
     # Check event stuff, like anss...
-    assert event['type'] == "earthquake" 
+    assert event['type'] == "earthquake"
     if isinstance(event['description'], dict):
         assert event['description'].get('type') == "nearest cities"
     assert 'origin' in event and len(event['origin']) > 0
@@ -79,7 +79,7 @@ def test_noprefor():
     qmlroot = conv.event2root(event)
     assert isinstance(qmlroot, dict)
     assert 'q:quakeml' in qmlroot
-    
+
     # Generate QuakeML and validate
     qmls = dumps(qmlroot, indent="  ", pretty=True, preprocessor=my_preproc)
     if pytest.config.getoption("--writefiles"):
@@ -89,11 +89,11 @@ def test_noprefor():
 
 @integration
 def test_nullphase():
-    """Test case of no phase in arrival""" 
+    """Test case of no phase in arrival"""
     import logging
     from qmlutil import dumps, Rounder
-    from qmlutil.aux.xml import validate
-    from qmlutil.aux.antelope import Db2Quakeml
+    from qmlutil.plugins.xml import validate
+    from qmlutil.plugins.antelope import Db2Quakeml
     #from qmlutil.ichinose import IchinoseToQmlConverter
 
     # Preprocessor for XML serialization
@@ -106,13 +106,13 @@ def test_nullphase():
 
     # Convert and check for everything we asked for (ANSS, phases, etc)
     logging.basicConfig() # config root logger TODO: change to mudule logger:
-    # 'qmlutil.aux.antelope'
+    # 'qmlutil.plugins.antelope'
     conv = Db2Quakeml(**CFG)
     # ------------------------------------------------------------------------
     # Test event generation
     event = conv.get_event(dsn, orid, pick=True, focalMechanism=True, anss=True)
     # Check event stuff, like anss...
-    assert event['type'] == "earthquake" 
+    assert event['type'] == "earthquake"
     if isinstance(event['description'], dict):
         assert event['description'].get('type') == "nearest cities"
     assert 'origin' in event and len(event['origin']) > 0
@@ -127,7 +127,7 @@ def test_nullphase():
     qmlroot = conv.event2root(event)
     assert isinstance(qmlroot, dict)
     assert 'q:quakeml' in qmlroot
-    
+
     # Generate QuakeML and validate
     qmls = dumps(qmlroot, indent="  ", pretty=True, preprocessor=my_preproc)
     if pytest.config.getoption("--writefiles"):
@@ -138,11 +138,11 @@ def test_nullphase():
 
 @integration
 def test_db2qml():
-    """Test the whole integrated shebang""" 
+    """Test the whole integrated shebang"""
     import logging
     from qmlutil import dumps, Rounder
-    from qmlutil.aux.xml import validate
-    from qmlutil.aux.antelope import Db2Quakeml
+    from qmlutil.plugins.xml import validate
+    from qmlutil.plugins.antelope import Db2Quakeml
     from qmlutil.ichinose import IchinoseToQmlConverter
 
     # Preprocessor for XML serialization
@@ -155,14 +155,14 @@ def test_db2qml():
 
     # Convert and check for everything we asked for (ANSS, phases, etc)
     logging.basicConfig() # config root logger TODO: change to mudule logger:
-    # 'qmlutil.aux.antelope'
+    # 'qmlutil.plugins.antelope'
     conv = Db2Quakeml(**CFG)
-    
+
     # ------------------------------------------------------------------------
     # Test event generation
     event = conv.get_event(dsn, orid, pick=True, focalMechanism=True, anss=True)
     # Check event stuff, like anss...
-    assert event['type'] == "earthquake" 
+    assert event['type'] == "earthquake"
     if isinstance(event['description'], dict):
         assert event['description'].get('type') == "nearest cities"
     assert 'origin' in event and len(event['origin']) > 0
@@ -178,81 +178,81 @@ def test_db2qml():
     qmlroot = conv.event2root(event)
     assert isinstance(qmlroot, dict)
     assert 'q:quakeml' in qmlroot
-    
+
     # Generate QuakeML and validate
     qmls = dumps(qmlroot, indent="  ", pretty=True, preprocessor=my_preproc)
     if pytest.config.getoption("--writefiles"):
         with open('/tmp/qmlutil-test.xml', 'w') as f:
             f.write(qmls)
     assert validate(qmls)
-    
+
     # ------------------------------------------------------------------------
     # Test delete from ORID
     event = conv.get_deleted_event(dsn, orid=orid, anss=True)
-    assert event['type'] == "not existing" 
+    assert event['type'] == "not existing"
     assert event['@catalog:eventid'] == "00524465"
     assert event['@catalog:dataid'] == "nn00524465"
     assert event['@catalog:datasource'] == "nn"
     assert event['@catalog:eventsource'] == "nn"
     assert event['@publicID'] == "quakeml:edu.unr.seismo/event/524465"
-    
+
     qmlroot = conv.event2root(event)
     assert isinstance(qmlroot, dict)
     assert 'q:quakeml' in qmlroot
-    
+
     # Generate QuakeML and validate
     qmls = dumps(qmlroot, indent="  ", pretty=True, preprocessor=my_preproc)
     if pytest.config.getoption("--writefiles"):
         with open('/tmp/qmlutil-test-delete-orid.xml', 'w') as f:
             f.write(qmls)
     assert validate(qmls)
-    
+
     # ------------------------------------------------------------------------
     # Test delete from EVID -- non-existing
     event = conv.get_deleted_event("/tmp/4c267822-3f72-4501-91fc-651851fd50a5", evid=evid, anss=True)
-    assert event['type'] == "not existing" 
+    assert event['type'] == "not existing"
     assert event['@catalog:eventid'] == "00524465"
     assert event['@catalog:dataid'] == "nn00524465"
     assert event['@catalog:datasource'] == "nn"
     assert event['@catalog:eventsource'] == "nn"
     assert event['@publicID'] == "quakeml:edu.unr.seismo/event/524465"
-    
+
     qmlroot = conv.event2root(event)
     assert isinstance(qmlroot, dict)
     assert 'q:quakeml' in qmlroot
-    
+
     # Generate QuakeML and validate
     qmls = dumps(qmlroot, indent="  ", pretty=True, preprocessor=my_preproc)
     if pytest.config.getoption("--writefiles"):
         with open('/tmp/qmlutil-test-delete-evid.xml', 'w') as f:
             f.write(qmls)
     assert validate(qmls)
-    
-   
+
+
 @integration
 def test_ichinose_file():
     """Test building verified QuakeML from Ichinose solution file"""
     from qmlutil import (dumps, Rounder, ResourceURIGenerator, Root,
         timestamp2isostr)
-    from qmlutil.aux.xml import validate
+    from qmlutil.plugins.xml import validate
     from qmlutil.ichinose import IchinoseToQmlConverter
-    
+
     # Preprocessor for XML serialization
     my_preproc = Rounder()
-    
+
     # Test QuakeML file from text MT solution
     MT_FILE = os.path.join(PWD, 'data', 'mt_509589.txt')
     with open(MT_FILE) as f:
         ichicnv = IchinoseToQmlConverter(
-            f, 
-            rid_factory=ResourceURIGenerator("quakeml", CFG['authority_id']), 
+            f,
+            rid_factory=ResourceURIGenerator("quakeml", CFG['authority_id']),
             utc_factory=timestamp2isostr,
             agency=CFG['agency_id'],
         )
         event = ichicnv.get_event(anss=True)
-    
+
     qmlroot = ichicnv.event2root(event)
-    
+
     assert isinstance(qmlroot, dict)
     assert 'q:quakeml' in qmlroot
     # Generate QuakeML and validate
@@ -261,5 +261,5 @@ def test_ichinose_file():
         with open('/tmp/qmlutil-test-ichinose-mt.xml', 'w') as f:
             f.write(qmls)
     assert validate(qmls)
-    
+
 

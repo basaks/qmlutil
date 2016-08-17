@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 """
-qmlutil.aux.antelope
+qmlutil.plugins.antelope
 
 Utillites for extracting data from Antelope -- 3rd party libs required
 """
@@ -40,10 +40,10 @@ class DatabaseConverter(object):
     def __init__(self, connection, converter):
         self.connection = connection
         self.converter = converter
-        
+
         self.connection.row_factory = OrderedDictRow
         self.connection.CONVERT_NULL = True
-    
+
     def _evid(self, orid):
         """
         Get EVID from ORID
@@ -63,7 +63,7 @@ class DatabaseConverter(object):
         if rec:
             ev = curs.fetchone()
             return self.converter.map_event(ev, anss=anss)
-    
+
     def get_event_from_origin(self, orid=None, anss=False):
         """
         Get event from origin table (in case no event/prefor)
@@ -78,7 +78,7 @@ class DatabaseConverter(object):
     def get_focalmechs(self, orid=None):
         """
         Returns FocalMechanism instances of an ORID
-        
+
         Inputs
         ------
         orid : int of ORID
@@ -88,18 +88,18 @@ class DatabaseConverter(object):
         list of FocalMechanism types
 
         """
-        cmd = ['dbopen fplane', 'dbsubset orid=={0}'.format(orid), 
+        cmd = ['dbopen fplane', 'dbsubset orid=={0}'.format(orid),
             'dbsort -r lddate']
         curs = self.connection.cursor()
         rec = curs.execute('process', [cmd] )
         curs.CONVERT_NULL = False  # Antelope schema bug - missing fplane NULLS
         return self.converter.convert_focalmechs(curs, "fplane")
-    
+
     def get_mts(self, orid=None):
         """
         Returns FocalMechanism instances or ORID from mt table
         """
-        cmd = ['dbopen mt', 'dbsubset orid=={0}'.format(orid), 
+        cmd = ['dbopen mt', 'dbsubset orid=={0}'.format(orid),
             'dbsort -r lddate']
         curs = self.connection.cursor()
         rec = curs.execute('process', [cmd] )
@@ -108,10 +108,10 @@ class DatabaseConverter(object):
     def get_origins(self, orid=None, evid=None):
         """
         Returns Origin instances from an ORID or EVID
-        
+
         Inputs
         ------
-        orid : int of ORID 
+        orid : int of ORID
         evid : int of EVID
 
         Returns
@@ -125,16 +125,16 @@ class DatabaseConverter(object):
             substr = 'dbsubset evid=={0}'.format(evid)
         else:
             raise ValueError("Need to specify an ORID or EVID")
-        
+
         cmd = ['dbopen origin', 'dbjoin -o origerr', substr, 'dbsort -r lddate']
         curs = self.connection.cursor()
         rec = curs.execute('process', [cmd] )
         return self.converter.convert_origins(curs)
-    
+
     def get_magnitudes(self, orid=None, evid=None):
         """
         Return list of Magnitudes from ORID
-        
+
         Inputs
         ------
         orid : int of orid
@@ -142,7 +142,7 @@ class DatabaseConverter(object):
         Returns
         -------
         list of Magnitude types
-        
+
         Notes
         -----
         Right now, looks in 'netmag', then 'origin', and assumes anything in netmag
@@ -153,7 +153,7 @@ class DatabaseConverter(object):
         # evid = self._evid(orid)
         # substr = 'dbsubset evid=={0}'.format(evid)
         substr = 'dbsubset orid=={0}'.format(orid)
-        
+
         # 1. Check netmag table
         curs = self.connection.cursor()
         rec = curs.execute('process', [('dbopen netmag', substr, 'dbsort -r lddate')] )
@@ -166,14 +166,14 @@ class DatabaseConverter(object):
         rec = curs.execute('process', [('dbopen origin', substr)] )
         if rec:
             db = curs.fetchone()
-            mags += [self.converter.map_origin2magnitude(db, mtype=mtype) 
+            mags += [self.converter.map_origin2magnitude(db, mtype=mtype)
                      for mtype in ('ml', 'mb', 'ms') if db.get(mtype)]
         return mags
 
     def get_phases(self, orid=None, evid=None):
         """
         Return lists of obspy Arrivals and Picks from an ORID
-        
+
         Inputs
         ------
         int of ORID
@@ -199,7 +199,7 @@ class DatabaseConverter(object):
         if not event:
             event = self.get_event_from_origin(orid, anss=anss)
 
-        # Should return one origin (given one ORID) 
+        # Should return one origin (given one ORID)
         if origin:
             _origins = self.get_origins(orid)
             if len(_origins) < 1:
@@ -247,7 +247,7 @@ def get_nearest_place(dsn, coords):
         distances = [curs.execute.ex_eval("deg2km(distance({elat}, {elon}, lat, lon))".format(**coord)) for curs._record in range(curs.rowcount)]
         backazis = [curs.execute.ex_eval("azimuth(lat, lon, {elat}, {elon})".format(**coord)) for curs._record in range(curs.rowcount)]
         # Find the record with the min distance
-        ind = min(xrange(len(distances)), key=distances.__getitem__) 
+        ind = min(xrange(len(distances)), key=distances.__getitem__)
         dist = distances[ind]
         backazi = backazis[ind]
         curs.scroll(int(ind), 'absolute')
@@ -273,7 +273,7 @@ class Db2Quakeml(object):
     etype_map = {}
     placesdb = None
     _prefmags = []
-    
+
     logger = logging.getLogger()
 
     @property
@@ -296,13 +296,13 @@ class Db2Quakeml(object):
 
         # Make Converter
         self._conv = qml.CSSToQMLConverter(
-            agency=self.agency_id, 
-            rid_factory=qml.ResourceURIGenerator("quakeml", self.authority_id), 
+            agency=self.agency_id,
+            rid_factory=qml.ResourceURIGenerator("quakeml", self.authority_id),
             utc_factory=qml.timestamp2isostr,
             etype_map=self.etype_map,
             automatic_authors=self.automatic_authors,
         )
-    
+
     def get_deleted_event(self, dsn, orid=None, evid=None, anss=False, **kwargs):
         """
         Return a stub event set to "not existing"
@@ -322,7 +322,7 @@ class Db2Quakeml(object):
         finally:
             ev['type'] = "not existing"
         return ev
-                
+
     def get_event(self, dsn, orid=None, evid=None, origin=True, magnitude=True, pick=False,
             focalMechanism=False, anss=False):
         """
@@ -334,7 +334,7 @@ class Db2Quakeml(object):
         #with connect(dsn, row_factory=OrderedDictRow, CONVERT_NULL=True) as conn:
         with connect(dsn) as conn:
             db = DatabaseConverter(conn, self._conv)
-            ev = db.extract_origin(orid, origin=origin, magnitude=magnitude, 
+            ev = db.extract_origin(orid, origin=origin, magnitude=magnitude,
                     pick=pick, focalMechanism=focalMechanism, anss=anss)
 
         #

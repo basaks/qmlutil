@@ -1,6 +1,6 @@
 #
 import os
-from qmlutil.aux.xml import validate
+from qmlutil.plugins.xml import validate
 
 PWD = os.path.dirname(__file__)
 
