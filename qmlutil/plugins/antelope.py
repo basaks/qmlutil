@@ -21,6 +21,7 @@ Utillites for extracting data from Antelope -- 3rd party libs required
 """
 import math
 import logging
+import json
 
 from curds2.dbapi2 import connect
 from curds2.rows import OrderedDictRow
@@ -170,6 +171,40 @@ class DatabaseConverter(object):
                      for mtype in ('ml', 'mb', 'ms') if db.get(mtype)]
         return mags
 
+    def get_stamagnitudes(self, orid=None, evid=None):
+        """
+        Return list of Magnitudes from ORID
+
+        Inputs
+        ------
+        orid : int of orid
+
+        Returns
+        -------
+        list of Magnitude types
+
+        Notes
+        -----
+        Right now, looks in 'netmag', then 'origin', and assumes anything in netmag
+        is in 'origin', that may or may not be true...
+        """
+        stamags = []
+        # TODO: try evid first
+        # evid = self._evid(orid)
+        # substr = 'dbsubset evid=={0}'.format(evid)
+        substr = 'dbsubset orid=={0}'.format(orid)
+
+        # 1. Check netmag table
+        curs = self.connection.cursor()
+        rec = curs.execute('process', [('dbopen stamag', substr, 'dbsort -r lddate')] )
+        if rec:
+            stamags += [self.converter.map_stamag2stationmagnitude(db) for db in curs]
+            return stamags
+
+        return stamags
+
+
+
     def get_phases(self, orid=None, evid=None):
         """
         Return lists of obspy Arrivals and Picks from an ORID
@@ -208,6 +243,8 @@ class DatabaseConverter(object):
             event['origin'] = _origins
         if magnitude:
             event['magnitude'] = self.get_magnitudes(orid)
+            event['stationMagnitude']= self.get_stamagnitudes(orid)
+
         if pick:
             picks_arrivals = self.get_phases(orid)
             if origin and picks_arrivals:
@@ -332,6 +369,7 @@ class Db2Quakeml(object):
         ##############################################################################
         # Make db Connection -- wrap in context
         #with connect(dsn, row_factory=OrderedDictRow, CONVERT_NULL=True) as conn:
+        
         with connect(dsn) as conn:
             db = DatabaseConverter(conn, self._conv)
             ev = db.extract_origin(orid, origin=origin, magnitude=magnitude,
@@ -363,6 +401,10 @@ class Db2Quakeml(object):
             ev['description'] = self._conv.description(ncd)
         except Exception as e:
             self.logger.exception(e)
+            
+        f = open('workfile', 'w')    
+        json.dump(ev, f, indent=2)
+        
         return ev
 
     def event2root(self, ev):

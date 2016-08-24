@@ -348,6 +348,14 @@ class CSSToQMLConverter(Root):
                 ('uncertainty', db.get('uncertainty')),
                 ]),
             ),
+             ('waveformID', Dict([
+                ('@stationCode', db.get('sta') or ""), 
+                ('@channelCode', db.get('chan') or ""),
+                ('@networkCode', db.get('net') or ""),
+                ('@locationCode', db.get('loc') or ""),
+                ('#text', self._uri(stamagID_rid, schema="smi")),  #'resourceURI' in schema
+                ])
+            ),
             ('type', db.get('magtype')),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
