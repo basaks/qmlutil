@@ -402,8 +402,8 @@ class Db2Quakeml(object):
         except Exception as e:
             self.logger.exception(e)
             
-        f = open('workfile', 'w')    
-        json.dump(ev, f, indent=2)
+        #f = open('workfile', 'w')    
+        #json.dump(ev, f, indent=2)
         
         return ev
 
