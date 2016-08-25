@@ -35,7 +35,7 @@ class DatabaseConverter(object):
     Methods take an ORID, return QML elements/types
     """
     connection = None  # DBAPI2 standard connection
-    converter = None # converter class
+    converter = None  # converter class
 
     def __init__(self, connection, converter):
         self.connection = connection
@@ -48,7 +48,9 @@ class DatabaseConverter(object):
         """
         Get EVID from ORID
         """
-        cmd = ['dbopen origin', 'dbsubset orid=={0}'.format(orid), 'dbsort lddate']
+        cmd = ['dbopen origin',
+               'dbsubset orid=={0}'.format(orid),
+               'dbsort lddate']
         curs = self.connection.cursor()
         rec = curs.execute('process', [cmd])
         if rec:
@@ -57,7 +59,8 @@ class DatabaseConverter(object):
     def get_event(self, orid=None, evid=None, anss=False):
         if orid and not evid:
             evid = self._evid(orid)
-        cmd = ['dbopen event', 'dbsubset evid=={0}'.format(evid)]
+        cmd = ['dbopen event',
+               'dbsubset evid=={0}'.format(evid)]
         curs = self.connection.cursor()
         rec = curs.execute('process', [cmd])
         if rec:
@@ -88,10 +91,11 @@ class DatabaseConverter(object):
         list of FocalMechanism types
 
         """
-        cmd = ['dbopen fplane', 'dbsubset orid=={0}'.format(orid),
-            'dbsort -r lddate']
+        cmd = ['dbopen fplane',
+               'dbsubset orid=={0}'.format(orid),
+               'dbsort -r lddate']
         curs = self.connection.cursor()
-        rec = curs.execute('process', [cmd] )
+        curs.execute('process', [cmd])
         curs.CONVERT_NULL = False  # Antelope schema bug - missing fplane NULLS
         return self.converter.convert_focalmechs(curs, "fplane")
 
@@ -99,10 +103,11 @@ class DatabaseConverter(object):
         """
         Returns FocalMechanism instances or ORID from mt table
         """
-        cmd = ['dbopen mt', 'dbsubset orid=={0}'.format(orid),
-            'dbsort -r lddate']
+        cmd = ['dbopen mt',
+               'dbsubset orid=={0}'.format(orid),
+               'dbsort -r lddate']
         curs = self.connection.cursor()
-        rec = curs.execute('process', [cmd] )
+        curs.execute('process', [cmd])
         return self.converter.convert_focalmechs(curs, "mt")
 
     def get_origins(self, orid=None, evid=None):
@@ -126,9 +131,11 @@ class DatabaseConverter(object):
         else:
             raise ValueError("Need to specify an ORID or EVID")
 
-        cmd = ['dbopen origin', 'dbjoin -o origerr', substr, 'dbsort -r lddate']
+        cmd = ['dbopen origin',
+               'dbjoin -o origerr', substr,
+               'dbsort -r lddate']
         curs = self.connection.cursor()
-        rec = curs.execute('process', [cmd] )
+        curs.execute('process', [cmd])
         return self.converter.convert_origins(curs)
 
     def get_magnitudes(self, orid=None, evid=None):
@@ -145,8 +152,8 @@ class DatabaseConverter(object):
 
         Notes
         -----
-        Right now, looks in 'netmag', then 'origin', and assumes anything in netmag
-        is in 'origin', that may or may not be true...
+        Right now, looks in 'netmag', then 'origin', and assumes anything in
+        netmag is in 'origin', that may or may not be true...
         """
         mags = []
         # TODO: try evid first
@@ -156,14 +163,15 @@ class DatabaseConverter(object):
 
         # 1. Check netmag table
         curs = self.connection.cursor()
-        rec = curs.execute('process', [('dbopen netmag', substr, 'dbsort -r lddate')] )
+        rec = curs.execute('process', [('dbopen netmag', substr,
+                                        'dbsort -r lddate')])
         if rec:
             mags += [self.converter.map_netmag2magnitude(db) for db in curs]
             return mags
 
         # 2. Check the origin table for the 3 types it holds
         curs = self.connection.cursor()
-        rec = curs.execute('process', [('dbopen origin', substr)] )
+        rec = curs.execute('process', [('dbopen origin', substr)])
         if rec:
             db = curs.fetchone()
             mags += [self.converter.map_origin2magnitude(db, mtype=mtype)
@@ -188,10 +196,11 @@ class DatabaseConverter(object):
                'dbjoin arrival', 'dbjoin -o snetsta',
                'dbjoin -o schanloc sta chan']
         curs = self.connection.cursor()
-        rec = curs.execute('process', [cmd] )
+        curs.execute('process', [cmd])
         return self.converter.convert_phases(curs)
 
-    def extract_origin(self, orid, origin=True, magnitude=True, pick=False, focalMechanism=False, anss=False):
+    def extract_origin(self, orid, origin=True, magnitude=True, pick=False,
+                       focalMechanism=False, anss=False):
         """
         Extract a QML Event from CSS database given an ORID
         """
@@ -208,6 +217,7 @@ class DatabaseConverter(object):
             event['origin'] = _origins
         if magnitude:
             event['magnitude'] = self.get_magnitudes(orid)
+            # TODO: station magnitudes!
         if pick:
             picks_arrivals = self.get_phases(orid)
             if origin and picks_arrivals:
@@ -215,17 +225,19 @@ class DatabaseConverter(object):
                 event['pick'] = _picks
                 try:
                     event['origin'][0]['arrival'] = _arrivals
-                except StandardError as e:
-                    pass # log no origin
-                # TODO: more stuff -- derive from arrivals, like stationCount, etc
+                except Exception as e:
+                    pass  # log no origin
+                # TODO: more stuff -- derive from arrivals, e.g stationCount
                 for o in event.get('origin', []):
                     try:
-                        #o['quality'] = in case none yet???
-                        o.get('quality', {}).update(qml.get_quality_from_arrival(o['arrival']))
-                    except StandardError as e:
+                        # o['quality'] = in case none yet???
+                        o.get('quality', {}).update(
+                            qml.get_quality_from_arrival(o['arrival']))
+                    except Exception as e:
                         pass
         if focalMechanism:
-            event['focalMechanism'] = self.get_mts(orid) + self.get_focalmechs(orid)
+            event['focalMechanism'] = self.get_mts(orid) + \
+                self.get_focalmechs(orid)
         return event
 
 
@@ -237,15 +249,20 @@ def get_nearest_place(dsn, coords):
 
     Relies on Antelope procedure calls...
     """
-    compass = ('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW')
+    compass = ('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+               'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW')
     wedge = 360./len(compass)
 
     with connect(dsn, row_factory=OrderedDictRow, CONVERT_NULL=True) as conn:
         coord = {'elat': coords[1], 'elon': coords[0]}
         curs = conn.cursor()
-        n = curs.execute.lookup(table='places')
-        distances = [curs.execute.ex_eval("deg2km(distance({elat}, {elon}, lat, lon))".format(**coord)) for curs._record in range(curs.rowcount)]
-        backazis = [curs.execute.ex_eval("azimuth(lat, lon, {elat}, {elon})".format(**coord)) for curs._record in range(curs.rowcount)]
+        curs.execute.lookup(table='places')
+        cmd = "deg2km(distance({elat}, {elon}, lat, lon))"
+        distances = [curs.execute.ex_eval(cmd.format(**coord))
+                     for curs._record in range(curs.rowcount)]
+        cmd = "azimuth(lat, lon, {elat}, {elon})"
+        backazis = [curs.execute.ex_eval(cmd.format(**coord))
+                    for curs._record in range(curs.rowcount)]
         # Find the record with the min distance
         ind = min(xrange(len(distances)), key=distances.__getitem__)
         dist = distances[ind]
@@ -254,8 +271,12 @@ def get_nearest_place(dsn, coords):
         minrec = curs.fetchone()
         shift_azi = (backazi+wedge/2) - (360 * (int(backazi+wedge/2) / 360))
         needle = compass[int(math.floor(shift_azi/wedge))]
-        place_info = {'distance': dist, 'direction': needle, 'city': minrec['place'], 'state': minrec['state']}
-        s = "{distance:0.1f} km {direction} of {city}, {state}".format(**place_info)
+        place_info = {'distance': dist,
+                      'direction': needle,
+                      'city': minrec['place'],
+                      'state': minrec['state']}
+        s = "{distance:0.1f} km {direction} of {city}, {state}".format(
+            **place_info)
         return s
 
 
@@ -279,6 +300,7 @@ class Db2Quakeml(object):
     @property
     def preferred_magtypes(self):
         return self._prefmags
+
     @preferred_magtypes.setter
     def preferred_magtypes(self, mtypes):
         if isinstance(mtypes, str):
@@ -300,10 +322,10 @@ class Db2Quakeml(object):
             rid_factory=qml.ResourceURIGenerator("quakeml", self.authority_id),
             utc_factory=qml.timestamp2isostr,
             etype_map=self.etype_map,
-            automatic_authors=self.automatic_authors,
-        )
+            automatic_authors=self.automatic_authors)
 
-    def get_deleted_event(self, dsn, orid=None, evid=None, anss=False, **kwargs):
+    def get_deleted_event(self, dsn, orid=None, evid=None, anss=False,
+                          **kwargs):
         """
         Return a stub event set to "not existing"
 
@@ -323,34 +345,35 @@ class Db2Quakeml(object):
             ev['type'] = "not existing"
         return ev
 
-    def get_event(self, dsn, orid=None, evid=None, origin=True, magnitude=True, pick=False,
-            focalMechanism=False, anss=False):
+    def get_event(self, dsn, orid=None, evid=None, origin=True, magnitude=True,
+                  pick=False, focalMechanism=False, anss=False):
         """
         Run conversion with config
         """
         # IF REGULAR EVENT, USE DATABASE
-        ##############################################################################
+        #######################################################################
         # Make db Connection -- wrap in context
-        #with connect(dsn, row_factory=OrderedDictRow, CONVERT_NULL=True) as conn:
+        # with connect(dsn, row_factory=OrderedDictRow, CONVERT_NULL=True) as conn: # noqa
         with connect(dsn) as conn:
             db = DatabaseConverter(conn, self._conv)
             ev = db.extract_origin(orid, origin=origin, magnitude=magnitude,
-                    pick=pick, focalMechanism=focalMechanism, anss=anss)
+                                   pick=pick, focalMechanism=focalMechanism,
+                                   anss=anss)
 
-        #
-        # Set preferreds. The extract method should return in reversed time order, so
-        # always choosing the first origin, mag, should be an OK default. Need to use
-        # an algorithm for a preferred mag type. For focalmechs, should be mt solutions
-        # in reversed time order, then first motions in reveresed time order. This
-        # means that a default would be any latest MT, then any latest FM. Or write
-        # custom algorithm.
-        #
+        # Set preferreds. The extract method should return in reversed time
+        # order, so always choosing the first origin, mag, should be an OK
+        # default. Need to use an algorithm for a preferred mag type. For
+        # focalmechs, should be mt solutions in reversed time order, then
+        # first motions in reveresed time order. This means that a default
+        # would be any latest MT, then any latest FM. Or writecustom algorithm.
+
         try:
             ev['preferredOriginID'] = ev['origin'][0]['@publicID']
-            ev['preferredMagnitudeID'] = qml.find_preferred_mag(ev['magnitude'][::-1],
-                    self.preferred_magtypes)
+            ev['preferredMagnitudeID'] = qml.find_preferred_mag(
+                ev['magnitude'][::-1], self.preferred_magtypes)
             if ev.get('focalMechanism'):
-                ev['preferredFocalMechanismID'] = ev['focalMechanism'][0]['@publicID']
+                ev['preferredFocalMechanismID'] = \
+                    ev['focalMechanism'][0]['@publicID']
         except Exception as e:
             self.logger.exception(e)
 
@@ -359,7 +382,8 @@ class Db2Quakeml(object):
         #
         try:
             orig = ev['origin'][0]
-            ncd = get_nearest_place(self.placesdb, (orig['longitude']['value'], orig['latitude']['value']))
+            ncd = get_nearest_place(self.placesdb, (orig['longitude']['value'],
+                                                    orig['latitude']['value']))
             ev['description'] = self._conv.description(ncd)
         except Exception as e:
             self.logger.exception(e)
