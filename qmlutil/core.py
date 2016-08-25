@@ -31,7 +31,7 @@ except ImportError as e:
 # Time format for string
 RFC3339 = '%Y-%m-%dT%H:%M:%S.%fZ'
 
-Q_NAMESPACE ="http://quakeml.org/xmlns/quakeml/1.2"       # xmlns:q
+Q_NAMESPACE = "http://quakeml.org/xmlns/quakeml/1.2"      # xmlns:q
 CATALOG_NAMESPACE = "http://anss.org/xmlns/catalog/0.1"   # xmlns:catalog
 BED_NAMESPACE = "http://quakeml.org/xmlns/bed/1.2"        # xmlns
 BEDRT_NAMESPACE = "http://quakeml.org/xmlns/bed-rt/1.2"   # xmlns
@@ -42,14 +42,15 @@ def _dt(timestamp):
     try:
         return datetime.datetime.utcfromtimestamp(timestamp)
     except:
-      return None
+        return None
 
 
-def _ts(dt):
+def _ts(datetime_input):
     """
     Return timestamp from datetime object
     """
-    return (dt-datetime.datetime(1970, 01, 01, 00, 00, 00)).total_seconds()
+    datetime_reference = datetime.datetime(1970, 1, 1, 0, 0, 0)
+    return (datetime_input - datetime_reference).total_seconds()
 
 
 def rfc3339(dt):
@@ -57,7 +58,7 @@ def rfc3339(dt):
     Format datetime in ISO8601
     """
     return dt.strftime(RFC3339)
-    
+
 
 def timestamp2isostr(timestamp):
     """
@@ -70,14 +71,15 @@ def timestamp2isostr(timestamp):
     try:
         return rfc3339(_dt(timestamp))
     except:
-      return None
+        return None
 
 
 class ResourceURIGenerator(object):
     """
     Create function to generate URI's for QuakeML
     """
-    _pattern = r"(smi|quakeml):[\w\d][\w\d\−\.\∗\(\)_~’]{2,}/[\w\d\−\.\∗\(\)_~’][\w\d\−\.\∗\(\)\+\?_~’=,;#/&amp;]∗" 
+    _pattern = r"(smi|quakeml):[\w\d][\w\d\−\.\∗\(\)_~’]{2,}" \
+        "/[\w\d\−\.\∗\(\)_~’][\w\d\−\.\∗\(\)\+\?_~’=,;#/&amp;]∗"
     schema = None
     authority_id = None
 
@@ -85,7 +87,8 @@ class ResourceURIGenerator(object):
         self.schema = schema
         self.authority_id = authority_id
 
-    def __call__(self, resource_id=None, local_id=None, authority_id=None, schema=None):
+    def __call__(self, resource_id=None, local_id=None, authority_id=None,
+                 schema=None):
         """
         Generate an id, given a resource-id and possible local-id, other parts
         can be overridden here as well
@@ -107,7 +110,7 @@ class ResourceURIGenerator(object):
 def find_preferred_mag(mags, prefmaglist=[]):
     """
     Given a seq of mag dicts, return the id of the preferred one
-    
+
     Note
     ----
     Returns the preferred of the last of any given type, so multiple 'mw'
@@ -152,8 +155,9 @@ def get_preferred(prefid, items):
 def station_count(arrivals, picks, used=False):
     """Return a station count"""
     if used:
-        ids = [a['pickID'] for a in arrivals if 'pickID' in a and
-            a.get('timeWeight', 0) > 0]
+        ids = [a['pickID']
+               for a in arrivals
+               if 'pickID' in a and a.get('timeWeight', 0) > 0]
     else:
         ids = [a['pickID'] for a in arrivals if 'pickID' in a]
     stations = set()
@@ -161,20 +165,20 @@ def station_count(arrivals, picks, used=False):
         p = get_preferred(i, picks)
         w = p.get('waveformID')
         if w:
-            stations.add("{0}_{1}".format(w['@networkCode'], w['@stationCode']))
+            stations.add("{0}_{1}".format(w['@networkCode'],
+                                          w['@stationCode']))
     return len(stations)
 
 
 def get_quality_from_arrival(arrivals):
     """
     Get OriginQuality data calculated from Origin Arrival info
-    
+
     NOTE: Only works for station counts if azimuths/distances are available
     """
-    azimuths =  {a['azimuth'] for a in arrivals}
+    azimuths = {a['azimuth'] for a in arrivals}
     distances = {a['distance'] for a in arrivals}
-    used_azis = {a['azimuth'] for a in arrivals if a.get('timeWeight',
-        0) > 0 }
+    used_azis = {a['azimuth'] for a in arrivals if a.get('timeWeight', 0) > 0}
     azi = list(azimuths)
     azi.sort()
     azi1 = list(azi)
@@ -189,7 +193,7 @@ def get_quality_from_arrival(arrivals):
     ])
     return quality
 
-    
+
 class Root(object):
     """
     Generic QuakeML root
@@ -200,12 +204,12 @@ class Root(object):
     Methods should return dicts of quakeml elements
     """
     _auth_id = "local"  # default to use if rid_factory is N/A
-    
-    agency  = 'XX'      # agency ID, ususally net code
+
+    agency = 'XX'       # agency ID, ususally net code
     doi = None          # DOI without scheme
     rid_factory = None  # ResourceURIGenerator function
-    utc_factory = None  # function(timestamp: float) 
-    
+    utc_factory = None  # function(timestamp: float)
+
     @property
     def auth_id(self):
         """authority-id"""
@@ -213,7 +217,7 @@ class Root(object):
             return self.rid_factory.authority_id or self._auth_id
         except:
             return self._auth_id
-    
+
     def _uri(self, obj=None, *args, **kwargs):
         """
         Return unique ResourceIdentifier URI
@@ -223,7 +227,7 @@ class Root(object):
         else:
             resource_id = str(obj)
         return self.rid_factory(resource_id, *args, **kwargs)
-    
+
     def _utc(self, timestamp):
         """
         Return a time representation given seconds timestamp float
@@ -234,46 +238,44 @@ class Root(object):
             return _dt(timestamp)
         else:
             return self.utc_factory(timestamp)
-    
+
     def __init__(self, *args, **kwargs):
         for key in kwargs:
             if hasattr(self, key):
                 setattr(self, key, kwargs[key])
-        
+
         if self.rid_factory is None:
             self.rid_factory = ResourceURIGenerator()
-    
+
     def event_parameters(self, **kwargs):
         """
         Create an EventParameters object
-        
+
         Return dict of eventParameters element given arrays of high-level
         elements as keywords i.e. event=[ev1, ev2, ev3].
 
         Should be valid for BED or BED-RT
         """
-        allowed = ('event', 'origin', 'magnitude', 'stationMagnitude', 
-            'focalMechanism', 'reading', 'pick', 'amplitude', 'description',
-            'comment', 'creationInfo')
-        
+        allowed = ('event', 'origin', 'magnitude', 'stationMagnitude',
+                   'focalMechanism', 'reading', 'pick', 'amplitude',
+                   'description', 'comment', 'creationInfo')
+
         dtnow = datetime.datetime.utcnow()
         ustamp = int(_ts(dtnow) * 10**6)
         catalogID_rid = "{0}/{1}".format('catalog', ustamp)
-        
+
         eventParameters = Dict([
             ('@publicID', self._uri(catalogID_rid)),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(_ts(dtnow))),
                 ('agencyID', self.agency),
                 ('version', str(ustamp)),
-                ])
-            ),
-        ])
+                ]))])
         for k in kwargs:
             if k in allowed:
                 eventParameters[k] = kwargs[k]
         return eventParameters
-        
+
     # TODO: save nsmap in attributes, build as generator/mapped fxn
     def qml(self, event_parameters, default_namespace=BED_NAMESPACE):
         """
@@ -299,5 +301,3 @@ class Root(object):
             catalog['creationInfo']['agencyURI'] = "smi:{0}".format(self.doi)
         qmlroot = self.qml(event_parameters=catalog)
         return qmlroot
-
-

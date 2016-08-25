@@ -51,7 +51,8 @@ import math
 import datetime
 import uuid
 
-from qmlutil import Dict, Root, ResourceURIGenerator, anss_params
+from qmlutil import Dict, Root, anss_params
+# from qmlutil import ResourceURIGenerator
 
 # Default weight to use based on timedef
 TIMEDEF_WEIGHT = dict(d=1.0, n=0.0)
@@ -74,15 +75,16 @@ def _dt(timestamp):
     """Returns the UTC dateTime"""
     try:
         return datetime.datetime.utcfromtimestamp(timestamp)
-    except:
+    except Exception as ex:
         return None
 
 
-def _ts(dt):
+def _ts(datetime_input):
     """
     Return timestamp from datetime object
     """
-    return (dt-datetime.datetime(1970, 1, 1, 0, 0, 0)).total_seconds()
+    datetime_reference = datetime.datetime(1970, 1, 1, 0, 0, 0)
+    return (datetime_input - datetime_reference).total_seconds()
 
 
 def _str(item):
@@ -126,16 +128,18 @@ def _m2deg_lat(dist):
 
 
 def _m2deg_lon(dist, lat=0.):
-    M = 6367449.
-    return dist / (math.pi / 180.) / M / math.cos(math.radians(lat))
+    average_earth_radius = 6367449.
+    return (dist / (math.pi / 180.) / average_earth_radius /
+            math.cos(math.radians(lat)))
 
 
-def _eval_ellipse(a, b, angle):
-    return a*b/(math.sqrt((b*math.cos(math.radians(angle)))**2 +
-                          (a*math.sin(math.radians(angle)))**2))
+def _eval_ellipse(semi_major, semi_minor, angle):
+    return semi_major*semi_minor/(math.sqrt(
+        (semi_minor*math.cos(math.radians(angle)))**2 +
+        (semi_major*math.sin(math.radians(angle)))**2))
 
 
-def _get_NE_on_ellipse(A, B, strike):
+def _get_ne_on_ellipse(semi_major, semi_minor, strike):
     """
     Return the solution for points N and E on an ellipse
 
@@ -147,9 +151,9 @@ def _get_NE_on_ellipse(A, B, strike):
     -------
     n, e : floats of ellipse solution at north and east
     """
-    n = _eval_ellipse(A, B, strike)
-    e = _eval_ellipse(A, B, strike-90)
-    return n, e
+    north = _eval_ellipse(semi_major, semi_minor, strike)
+    east = _eval_ellipse(semi_major, semi_minor, strike - 90)
+    return north, east
 
 
 def extract_etype(origin):
@@ -254,26 +258,26 @@ class CSSToQMLConverter(Root):
         css_etype = _str(db.get('etype'))
         posted_author = _str(db.get('auth'))
         mode, status = self.get_event_status(posted_author)
-        originID_rid = "{0}/{1}".format('origin',
-                                        db.get('orid') or uuid.uuid4())
+        origin_rid = "{0}/{1}".format('origin',
+                                      db.get('orid') or uuid.uuid4())
 
         # -- Solution Uncertainties ----------------------------------
         # in CSS the ellipse is projected onto the horizontal plane
         # using the covariance matrix
-        a = _km2m(db.get('smajax'))
-        b = _km2m(db.get('sminax'))
-        s = db.get('strike')
+        semi_major = _km2m(db.get('smajax'))
+        semi_minor = _km2m(db.get('sminax'))
+        strike = db.get('strike')
 
-        if all([a, b, s]):
-            n, e = _get_NE_on_ellipse(a, b, s)
-            lat_u = _m2deg_lat(n)
-            lon_u = _m2deg_lon(e, lat=db.get('lat') or 0.0)
+        if all([semi_major, semi_minor, strike]):
+            north, east = _get_ne_on_ellipse(semi_major, semi_minor, strike)
+            lat_u = _m2deg_lat(north)
+            lon_u = _m2deg_lon(east, lat=db.get('lat') or 0.0)
 
             uncertainty = Dict([
                 ('preferredDescription', "uncertainty ellipse"),
-                ('maxHorizontalUncertainty', a),
-                ('minHorizontalUncertainty', b),
-                ('azimuthMaxHorizontalUncertainty', s),
+                ('maxHorizontalUncertainty', semi_major),
+                ('minHorizontalUncertainty', semi_minor),
+                ('azimuthMaxHorizontalUncertainty', strike),
             ])
             if db.get('conf') is not None:
                 uncertainty['confidenceLevel'] = db.get('conf') * 100.
@@ -284,7 +288,7 @@ class CSSToQMLConverter(Root):
 
         # -- Basic Hypocenter ----------------------------------------
         origin = Dict([
-            ('@publicID', self._uri(originID_rid)),
+            ('@publicID', self._uri(origin_rid)),
             ('latitude', _quan([
                 ('value', db.get('lat')),
                 ('uncertainty', lat_u),
@@ -316,7 +320,7 @@ class CSSToQMLConverter(Root):
                 ('version', db.get('orid')),
                 ])),
             ('comment', [Dict([
-                ('@id', self._uri(originID_rid, local_id="etype")),
+                ('@id', self._uri(origin_rid, local_id="etype")),
                 ('text', css_etype),
                 ])]),
             ('arrival', []),
@@ -328,9 +332,9 @@ class CSSToQMLConverter(Root):
         """
         Map stamag record to StationMagnitude
         """
-        originID_rid = "{0}/{1}".format('origin',
-                                        db.get('orid') or uuid.uuid4())
-        stamagID_rid = "{0}/{1}-{2}-{3}-{4}".format(
+        origin_rid = "{0}/{1}".format('origin',
+                                      db.get('orid') or uuid.uuid4())
+        stamag_rid = "{0}/{1}-{2}-{3}-{4}".format(
             'stamag',
             db.get('sta'),
             db.get('magtype'),
@@ -339,10 +343,18 @@ class CSSToQMLConverter(Root):
         )
 
         stationmagnitude = Dict([
-            ('@publicID', self._uri(stamagID_rid)),
+            ('@publicID', self._uri(stamag_rid)),
             ('mag', Dict([
                 ('value', db.get('magnitude')),
                 ('uncertainty', db.get('uncertainty')),
+                ])),
+            ('waveformID', Dict([
+                ('@stationCode', db.get('sta') or ""),
+                ('@channelCode', db.get('chan') or ""),
+                ('@networkCode', db.get('net') or ""),
+                ('@locationCode', db.get('loc') or ""),
+                ('#text', self._uri(stamag_rid, schema="smi")),
+                # 'resourceURI' in schema
                 ])),
             ('type', db.get('magtype')),
             ('creationInfo', Dict([
@@ -351,7 +363,7 @@ class CSSToQMLConverter(Root):
                 ('author', db.get('auth')),
                 ('version', db.get('magid')),
                 ])),
-            ('originID', self._uri(originID_rid)),
+            ('originID', self._uri(origin_rid)),
         ])
         return stationmagnitude
 
@@ -375,20 +387,20 @@ class CSSToQMLConverter(Root):
         """
         posted_author = _str(db.get('auth'))
         mode, status = self.get_event_status(posted_author)
-        originID_rid = "{0}/{1}".format('origin',
-                                        db.get('orid') or uuid.uuid4())
-        netmagID_rid = "{0}/{1}".format('netmag',
-                                        db.get('magid') or uuid.uuid4())
+        origin_rid = "{0}/{1}".format('origin',
+                                      db.get('orid') or uuid.uuid4())
+        netmag_rid = "{0}/{1}".format('netmag',
+                                      db.get('magid') or uuid.uuid4())
 
         magnitude = Dict([
-            ('@publicID', self._uri(netmagID_rid)),
+            ('@publicID', self._uri(netmag_rid)),
             ('mag', _quan([
                 ('value', db.get('magnitude')),
                 ('uncertainty', db.get('uncertainty')),
                 ])),
             ('type', db.get('magtype')),
             ('stationCount', db.get('nsta')),
-            ('originID', self._uri(originID_rid)),
+            ('originID', self._uri(origin_rid)),
             ('evaluationMode', mode),
             ('evaluationStatus', status),
             ('creationInfo', Dict([
@@ -421,23 +433,23 @@ class CSSToQMLConverter(Root):
         """
         author = _str(db.get('auth'))
         mode, status = self.get_event_status(author)
-        originID_rid = "{0}/{1}".format('origin',
-                                        db.get('orid') or uuid.uuid4())
+        origin_rid = "{0}/{1}".format('origin',
+                                      db.get('orid') or uuid.uuid4())
 
         # If foreign key to netmag table exists, use it as a unique id,
         # otherwise unique id is unique origin + local field
         netmagid = "{0}id".format(mtype)
         if db.get(netmagid):
-            origmagID_rid = "{0}/{1}".format('netmag', db.get(netmagid))
-            public_uri = self._uri(origmagID_rid)
+            origmag_rid = "{0}/{1}".format('netmag', db.get(netmagid))
+            public_uri = self._uri(origmag_rid)
         else:
-            public_uri = self._uri(originID_rid, local_id=mtype)
+            public_uri = self._uri(origin_rid, local_id=mtype)
 
         magnitude = Dict([
             ('@publicID', public_uri),
             ('mag', _quan(value=db.get(mtype))),
             ('type', mtype),
-            ('originID', self._uri(originID_rid)),
+            ('originID', self._uri(origin_rid)),
             ('evaluationMode', mode),
             ('evaluationStatus', status),
             ('creationInfo', Dict([
@@ -477,14 +489,14 @@ class CSSToQMLConverter(Root):
         def_net = self.agency[:2].upper()
         css_sta = db.get('sta')
         css_chan = db.get('chan')
-        wfID_rid = "{0}/{1}-{2}-{3}".format(
+        wf_rid = "{0}/{1}-{2}-{3}".format(
             'wfdisc',
             css_sta,
             css_chan,
             int(db.get('time') * 10**6),
         )
-        pickID_rid = "{0}/{1}".format('arrival',
-                                      db.get('arid') or uuid.uuid4())
+        pick_rid = "{0}/{1}".format('arrival',
+                                    db.get('arid') or uuid.uuid4())
 
         on_qual = _str(db.get('qual')).lower()
         if 'i' in on_qual:
@@ -515,7 +527,7 @@ class CSSToQMLConverter(Root):
             pick_status = "reviewed"
 
         pick = Dict([
-            ('@publicID', self._uri(pickID_rid)),
+            ('@publicID', self._uri(pick_rid)),
             ('time', _quan([
                 ('value', self._utc(db.get('time'))),
                 ('uncertainty', db.get('deltim')),
@@ -525,7 +537,7 @@ class CSSToQMLConverter(Root):
                 ('@channelCode', db.get('fchan') or css_chan),
                 ('@networkCode', db.get('snet') or def_net),
                 ('@locationCode', db.get('loc') or ""),
-                ('#text', self._uri(wfID_rid, schema="smi")),
+                ('#text', self._uri(wf_rid, schema="smi")),
                 # 'resourceURI' in schema
                 ])),
             ('phaseHint', db.get('iphase')),  # 'code' in schema
@@ -573,25 +585,25 @@ class CSSToQMLConverter(Root):
         assoc
         """
         css_timedef = _str(db.get('timedef'))
-        pickID_rid = "{0}/{1}".format('arrival',
-                                      db.get('arid') or uuid.uuid4())
-        vmodelID_rid = "{0}/{1}".format('vmodel',
-                                        db.get('vmodel') or uuid.uuid4())
-        assocID_rid = "{0}/{1}-{2}".format(
+        pick_rid = "{0}/{1}".format('arrival',
+                                    db.get('arid') or uuid.uuid4())
+        vmodel_rid = "{0}/{1}".format('vmodel',
+                                      db.get('vmodel') or uuid.uuid4())
+        assoc_rid = "{0}/{1}-{2}".format(
             'assoc',
             db.get('orid') or uuid.uuid4(),
             db.get('arid') or uuid.uuid4(),
         )
 
         arrival = Dict([
-            ('@publicID', self._uri(assocID_rid)),
-            ('pickID', self._uri(pickID_rid)),
+            ('@publicID', self._uri(assoc_rid)),
+            ('pickID', self._uri(pick_rid)),
             ('phase', db.get('phase')),
             ('azimuth', db.get('esaz')),
             ('distance', db.get('delta')),
             ('timeResidual', db.get('timeres')),
             ('timeWeight', db.get('wgt')),
-            ('earthModelID', self._uri(vmodelID_rid, schema="smi")),
+            ('earthModelID', self._uri(vmodel_rid, schema="smi")),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
@@ -656,10 +668,10 @@ class CSSToQMLConverter(Root):
         #
         # NOTE: Antelope schema for this is wrong, no nulls defined
         #
-        originID_rid = "{0}/{1}".format('origin',
-                                        db.get('orid') or uuid.uuid4())
-        fplaneID_rid = "{0}/{1}".format('fplane',
-                                        db.get('mechid') or uuid.uuid4())
+        origin_rid = "{0}/{1}".format('origin',
+                                      db.get('orid') or uuid.uuid4())
+        fplane_rid = "{0}/{1}".format('fplane',
+                                      db.get('mechid') or uuid.uuid4())
         author_string = ':'.join([db.get('algorithm'), db.get('auth')])
 
         # Determine from auth field
@@ -691,8 +703,8 @@ class CSSToQMLConverter(Root):
         ])
 
         focal_mechanism = Dict([
-            ('@publicID', self._uri(fplaneID_rid)),
-            ('triggeringOriginID', self._uri(originID_rid)),
+            ('@publicID', self._uri(fplane_rid)),
+            ('triggeringOriginID', self._uri(origin_rid)),
             ('nodalPlanes', nodal_planes),
             ('principalAxes', principal_axes),
             ('creationInfo', Dict([
@@ -730,24 +742,24 @@ class CSSToQMLConverter(Root):
         methods, i.e. map_mt2origin, map_mt2magnitude. There should be an "Mw"
         in the netmag table, not here.
         """
-        originID_rid = "{0}/{1}".format('origin',
-                                        db.get('orid') or uuid.uuid4())
-        mtID_rid = "{0}/{1}".format('mt',
-                                    db.get('mtid') or uuid.uuid4())
+        origin_rid = "{0}/{1}".format('origin',
+                                      db.get('orid') or uuid.uuid4())
+        mt_rid = "{0}/{1}".format('mt',
+                                  db.get('mtid') or uuid.uuid4())
 
         # This is wrong in the GS feed, have to map to valid QuakeML enum
         # the right place for this is Quakeml -> mt table, but do it here
         # in case no one did on ETL.
-        mode = dict([
-            ('automatic', "automatic"),
-            ('manual', "manual"),
-            ('reviewed', "manual"),
-        ]).get(db.get('rstatus'))  # should be EvaluationModeType
-        status = db.get('estatus')  # should be EvaluationStatusType
+        # mode = dict([
+        #     ('automatic', "automatic"),
+        #     ('manual', "manual"),
+        #     ('reviewed', "manual"),
+        # ]).get(db.get('rstatus'))  # should be EvaluationModeType
+        # status = db.get('estatus')  # should be EvaluationStatusType
 
         moment_tensor = Dict([
-            ('@publicID', self._uri(mtID_rid, local_id="tensor")),
-            ('derivedOriginID', self._uri(originID_rid)),
+            ('@publicID', self._uri(mt_rid, local_id="tensor")),
+            ('derivedOriginID', self._uri(origin_rid)),
             ('scalarMoment', _quan(value=db.get('scm'))),
             ('doubleCouple', db.get('pdc')),
             ('tensor', Dict([
@@ -799,8 +811,8 @@ class CSSToQMLConverter(Root):
         ])
 
         focal_mechanism = Dict([
-            ('@publicID', self._uri(mtID_rid, local_id="focalmech")),
-            ('triggeringOriginID', self._uri(originID_rid)),
+            ('@publicID', self._uri(mt_rid, local_id="focalmech")),
+            ('triggeringOriginID', self._uri(origin_rid)),
             ('nodalPlanes', nodal_planes),
             ('principalAxes', principal_axes),
             ('momentTensor', moment_tensor),
@@ -892,10 +904,10 @@ class CSSToQMLConverter(Root):
         evid = db.get('evid')
         lddate = db.get('lddate') or _ts(datetime.datetime.utcnow())
         prefor = db.get('prefor') or db.get('orid')
-        eventID_rid = "{0}/{1}".format('event', evid)
+        event_rid = "{0}/{1}".format('event', evid)
 
         event = Dict([
-            ('@publicID', self._uri(eventID_rid)),
+            ('@publicID', self._uri(event_rid)),
             ('type', "not reported"),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(lddate)),
@@ -905,8 +917,8 @@ class CSSToQMLConverter(Root):
         ])
         # Set the prefor if you gave on origin or the event table has one
         if prefor:
-            originID_rid = "{0}/{1}".format('origin', prefor)
-            event['preferredOriginID'] = self._uri(originID_rid)
+            origin_rid = "{0}/{1}".format('origin', prefor)
+            event['preferredOriginID'] = self._uri(origin_rid)
         #
         # Add the ANSS NS parameters automatically
         #
