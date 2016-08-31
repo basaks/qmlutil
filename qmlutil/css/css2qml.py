@@ -328,6 +328,7 @@ class CSSToQMLConverter(Root):
         """
         Map stamag record to StationMagnitude
         """
+        def_net = self.agency[:2].upper()
         originID_rid = "{0}/{1}".format('origin',
                                         db.get('orid') or uuid.uuid4())
         stamagID_rid = "{0}/{1}-{2}-{3}-{4}".format(
@@ -337,22 +338,20 @@ class CSSToQMLConverter(Root):
             db.get('orid') or uuid.uuid4(),
             db.get('magid') or uuid.uuid4(),
         )
-
+        # TODO: add amplitude_id, method_id
+        # TODO: add comments (if remark table/commid available)
         stationmagnitude = Dict([
             ('@publicID', self._uri(stamagID_rid)),
             ('mag', Dict([
                 ('value', db.get('magnitude')),
-                ('uncertainty', db.get('uncertainty')),
-                ]),
-            ),
-             ('waveformID', Dict([
-                ('@stationCode', db.get('sta') or ""), 
-                ('@channelCode', db.get('chan') or ""),
-                ('@networkCode', db.get('net') or ""),
-                ('@locationCode', db.get('loc') or ""),
-                ('#text', self._uri(stamagID_rid, schema="smi")),  #'resourceURI' in schema
-                ])
-            ),
+                ('uncertainty', db.get('uncertainty'))])),
+            ('waveformID', Dict([
+                ('@stationCode', db.get('sta')),
+                ('@channelCode', db.get('chan') or ""),  # not in stamag
+                ('@networkCode', def_net),
+                ('@locationCode', db.get('loc') or ""),  # not in stamag
+                ('#text', self._uri(stamagID_rid, schema="smi")),
+                ])),
             ('type', db.get('magtype')),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
@@ -382,6 +381,7 @@ class CSSToQMLConverter(Root):
         Any object that supports the dict 'get' method can be passed as
         input, e.g. OrderedDict, custom classes, etc.
         """
+        # TODO: add station_magnitude_contributions
         posted_author = _str(db.get('auth'))
         mode, status = self.get_event_status(posted_author)
         originID_rid = "{0}/{1}".format('origin',
