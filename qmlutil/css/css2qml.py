@@ -332,6 +332,7 @@ class CSSToQMLConverter(Root):
         """
         Map stamag record to StationMagnitude
         """
+        def_net = self.agency[:2].upper()
         origin_rid = "{0}/{1}".format('origin',
                                       db.get('orid') or uuid.uuid4())
         stamag_rid = "{0}/{1}-{2}-{3}-{4}".format(
@@ -346,15 +347,13 @@ class CSSToQMLConverter(Root):
             ('@publicID', self._uri(stamag_rid)),
             ('mag', Dict([
                 ('value', db.get('magnitude')),
-                ('uncertainty', db.get('uncertainty')),
-                ])),
+                ('uncertainty', db.get('uncertainty'))])),
             ('waveformID', Dict([
-                ('@stationCode', db.get('sta') or ""),
-                ('@channelCode', db.get('chan') or ""),
-                ('@networkCode', db.get('net') or ""),
-                ('@locationCode', db.get('loc') or ""),
+                ('@stationCode', db.get('sta')),
+                ('@channelCode', db.get('chan') or ""),  # not in stamag
+                ('@networkCode', def_net),
+                ('@locationCode', db.get('loc') or ""),  # not in stamag
                 ('#text', self._uri(stamag_rid, schema="smi")),
-                # 'resourceURI' in schema
                 ])),
             ('type', db.get('magtype')),
             ('creationInfo', Dict([
@@ -385,6 +384,7 @@ class CSSToQMLConverter(Root):
         Any object that supports the dict 'get' method can be passed as
         input, e.g. OrderedDict, custom classes, etc.
         """
+        # TODO: add station_magnitude_contributions
         posted_author = _str(db.get('auth'))
         mode, status = self.get_event_status(posted_author)
         origin_rid = "{0}/{1}".format('origin',
