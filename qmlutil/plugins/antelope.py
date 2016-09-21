@@ -186,7 +186,7 @@ class DatabaseConverter(object):
     def get_stamagnitudes(self, orid=None, evid=None):
         # pylint: disable=unused-argument
         """
-        Return list of Magnitudes from ORID
+        Return list of Station Magnitudes from ORID
 
         Inputs
         ------
@@ -194,26 +194,27 @@ class DatabaseConverter(object):
 
         Returns
         -------
-        list of Magnitude types
+        list of station magnitudes
 
         Notes
-        -----
-        Right now, looks in 'netmag', then 'origin', and assumes anything in
-        netmag is in 'origin', that may or may not be true...
+        -------
+        Tries to first join with remark table if available (not tested when
+        present)
+
         """
         stamags = []
-        # TODO: try evid first
-        # evid = self._evid(orid)
-        # substr = 'dbsubset evid=={0}'.format(evid)
-        substr = 'dbsubset orid=={0}'.format(orid)
-
-        # 1. Check netmag table
         curs = self.connection.cursor()
-        rec = curs.execute('process', [('dbopen stamag', substr,
-                                        'dbsort -r lddate')])
+        cmd = ['dbopen stamag', 'dbsubset orid=={0}'.format(orid),
+               'dbjoin remark', 'dbsort -r lddate']
+        rec = curs.execute('process', [cmd])
+        if rec <= 0:
+            curs = self.connection.cursor()
+            cmd = ['dbopen stamag', 'dbsubset orid=={0}'.format(orid),
+                   'dbsort -r lddate']
+            rec = curs.execute('process', [cmd])
         if rec:
-            stamags += [self.converter.map_stamag2stationmagnitude(db)
-                        for db in curs]
+            stamags += ([self.converter.map_stamag2stationmagnitude(db)
+                         for db in curs])
             return stamags
 
         return stamags
@@ -446,7 +447,8 @@ class Db2Quakeml(object):
         """
         Add event to parameters and root, append evid to publicID
         """
-        event_id = event.get('@publicID', '').split('/', 1)[-1].replace('/', '=')
+        event_id = event.get('@publicID', '').split('/', 1)[-1].replace('/',
+                                                                        '=')
         catalog = self._conv.event_parameters(event=[event])
         catalog['@publicID'] += "#{0}".format(event_id)
         if self.doi:
