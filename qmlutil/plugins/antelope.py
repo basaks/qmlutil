@@ -19,6 +19,7 @@ qmlutil.plugins.antelope
 
 Utillites for extracting data from Antelope -- 3rd party libs required
 """
+import os
 import math
 import logging
 
@@ -429,13 +430,15 @@ class Db2Quakeml(object):
         #
         # Try the nearest places thing...
         #
-        try:
-            orig = event['origin'][0]
-            ncd = get_nearest_place(self.placesdb, (orig['longitude']['value'],
-                                                    orig['latitude']['value']))
-            event['description'] = self._conv.description(ncd)
-        except Exception as ex:
-            self.logger.exception(ex)
+        if self.placesdb and os.path.exists(self.placesdb):
+            try:
+                orig = event['origin'][0]
+                ncd = get_nearest_place(self.placesdb,
+                                        (orig['longitude']['value'],
+                                         orig['latitude']['value']))
+                event['description'] = self._conv.description(ncd)
+            except Exception as ex:
+                self.logger.exception(ex)
 
         return event
 
