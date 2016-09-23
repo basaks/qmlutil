@@ -24,7 +24,7 @@ to XML (QuakeML) and vice versa
 
 Dumping is easy, assuming you keep the xmltodict syntax in your object.
 Loading from file/string is easy for the non-validating parser, but if you
-want types, we need to have access to the QuakeML XML schema. This module 
+want types, we need to have access to the QuakeML XML schema. This module
 attempts to do this.
 
 Note: Typing is thankfully NOT needed if the application is just creating SQL
@@ -47,7 +47,7 @@ XSTYPES = {
 }
 
 
-def dt(datetime_string):
+def dt(datetime_string):  # pylint: disable=unused-argument
     """
     Parse datetime string to python datetime.datetime
     """
@@ -58,7 +58,7 @@ class TypeExtractor(object):
     """Object to validate/entype XML"""
     XSDtypes = None  # holds flat map of nested elements/XML types
     PYtypes = None   # holds flat map of nested keys/python types
-    
+
     delim = '|'  # Nested key delimiter in type maps
     ns = "bed"   # namespace of XSDtypes keys
 
@@ -68,67 +68,70 @@ class TypeExtractor(object):
         """
         if isinstance(node, dict):
             if '@name' in node:
-                #print "Name: {0}, Type: {1}".format(node['@name'], node.get('@type'))
+                # print "Name: {0}, Type: {1}".format(node['@name'],
+                #                                     node.get('@type'))
                 name += self.delim + node['@name']
                 name = name.strip(self.delim)
                 if '@type' in node:
                     self.XSDtypes[name] = node['@type']
             if '@base' in node:
-                #print "Name: {0}, Base: {1}".format(node.get('@name'), node.get('@base'))
+                # print "Name: {0}, Base: {1}".format(node.get('@name'),
+                #                                     node.get('@base'))
                 self.XSDtypes[name] = node['@base']
-            
-            for n in node:
-                #print "Key: {0}".format(n)
-                if not n.startswith('@'):
-                    self.flatten(node[n], name)
-                #else:
-                #    print "Attribute: {}, STOPPING".format(n)
+
+            for subnode in node:
+                # print "Key: {0}".format(subnode)
+                if not subnode.startswith('@'):
+                    self.flatten(node[subnode], name)
+                # else:
+                #    print "Attribute: {}, STOPPING".format(subnode)
         elif isinstance(node, list):
-            for n in node:
-                self.flatten(n, name)
-    
+            for subnode in node:
+                self.flatten(subnode, name)
+
     def __init__(self, qml):
         self.qml = qml
         self.XSDtypes = dict()
         self.PYtypes = dict()
-    
+
     def entype(self, node, name=""):
         """
         Entype the whole dict/list struct under "node" given previously built
         types in self.PYtypes
-        
+
         todo, make deepcopy??
         """
         if isinstance(node, dict):
-            for n in node:
-                rname = self.delim.join([name, n]).strip(self.delim)
+            for subnode in node:
+                rname = self.delim.join([name, subnode]).strip(self.delim)
                 type_ = self.PYtypes.get(rname)
-                if isinstance(node[n], list):
-                    for _n in node[n]:
-                        self.entype(_n, rname)
-                elif isinstance(node[n], dict):
-                    self.entype(node[n], rname)
+                if isinstance(node[subnode], list):
+                    for subsubnode in node[subnode]:
+                        self.entype(subsubnode, rname)
+                elif isinstance(node[subnode], dict):
+                    self.entype(node[subnode], rname)
                 elif type_:
-                    node[n] = type_(node[n])
+                    node[subnode] = type_(node[subnode])
         return self.qml
 
     def gentypes(self, node, name="", realname=""):
         """
         Generate flat map of python types for every node in the tree
-        
+
         Map contains python types for given nodes
         Recursively try nested nodes in dict or list
         """
         if isinstance(node, dict):
             # Get new node names based on key
-            for n in node:
-                keyname = self.delim.join([name, n.lstrip('@')]).strip(self.delim)
-                rname = self.delim.join([realname, n]).strip(self.delim)
-                self.gentypes(node[n], keyname, rname)
+            for subnode in node:
+                keyname = self.delim.join([name, subnode.lstrip('@')])
+                keyname = keyname.strip(self.delim)
+                rname = self.delim.join([realname, subnode]).strip(self.delim)
+                self.gentypes(node[subnode], keyname, rname)
         elif isinstance(node, list):
             # Just pass on node names
-            for n in node:
-                self.gentypes(n, name, realname)
+            for subnode in node:
+                self.gentypes(subnode, name, realname)
         else:
             # Try to get a type
             type_ = self._gettype(name)
@@ -139,20 +142,19 @@ class TypeExtractor(object):
                     type_ = self._gettype(type_.lstrip("bed:"))
                     if type_ in XSTYPES:
                         type_ = XSTYPES[type_]
-                # Got a code, add to map of python types 
+                # Got a code, add to map of python types
                 if isinstance(type_, type):
                     self.PYtypes[realname] = type_
-    #
+
     # TODO: Ugly -- clean this up
     # TODO: use generic settable Ns instead of bed diectly
-    #
     def _gettype(self, key):
         """
         Follow the types through linked keys to get a basic type
         """
         type_ = None
-        kp = key.split(self.delim)
-        if len(kp) <= 2 :
+        key_parts = key.split(self.delim)
+        if len(key_parts) <= 2:
             if key in self.XSDtypes:
                 value = self.XSDtypes[key]
                 if value.startswith("bed:"):
@@ -160,21 +162,21 @@ class TypeExtractor(object):
                     type_ = self._gettype(value)
                 type_ = value
             else:
-                if kp[0] in self.XSDtypes:
-                    value = self.XSDtypes[kp[0]].lstrip("bed:")
-                    kp[0] = value
-                    newkey = self.delim.join(kp)
+                if key_parts[0] in self.XSDtypes:
+                    value = self.XSDtypes[key_parts[0]].lstrip("bed:")
+                    key_parts[0] = value
+                    newkey = self.delim.join(key_parts)
                     type_ = self._gettype(newkey)
         else:
-            if kp[0] in self.XSDtypes:
-                value = self.XSDtypes[kp[0]].lstrip("bed:")
-                kp[0] = value
-                newkey = self.delim.join(kp)
+            if key_parts[0] in self.XSDtypes:
+                value = self.XSDtypes[key_parts[0]].lstrip("bed:")
+                key_parts[0] = value
+                newkey = self.delim.join(key_parts)
                 type_ = self._gettype(newkey)
-            elif self.delim.join(kp[:2]) in self.XSDtypes:
-                value = self.XSDtypes[self.delim.join(kp[:2])].lstrip("bed:")
-                kp = [value] + kp[2:]
-                newkey = self.delim.join(kp)
+            elif self.delim.join(key_parts[:2]) in self.XSDtypes:
+                value = self.XSDtypes[self.delim.join(key_parts[:2])].lstrip("bed:")
+                key_parts = [value] + key_parts[2:]
+                newkey = self.delim.join(key_parts)
                 type_ = self._gettype(newkey)
         return type_
 
@@ -186,7 +188,7 @@ class TypeExtractor(object):
         return self.entype(self.qml)
 
 
-class Rounder(object):
+class Rounder(object):  # pylint: disable=too-few-public-methods
     """
     Rounder is an xmltodict preprocessor function for generating NSL QuakeML
 
@@ -197,66 +199,66 @@ class Rounder(object):
     general need for reproducibility in science.
     """
     @staticmethod
-    def _round(dict_, k, n):
+    def _round(dict_, key, num_digits):
         """
         Round a number given a dict, a key, and # of places.
         """
-        v = dict_.get(k)
-        if v is not None:
-            v = round(v, n)
-            dict_[k] = v
-    
+        value = dict_.get(key)
+        if value is not None:
+            value = round(value, num_digits)
+            dict_[key] = value
+
     def __init__(self):
         pass
 
-    def __call__(self, k, v):
+    def __call__(self, key, dict_):
         # Case of integer attribute
-        if k == "nodalPlanes" and v.get("@preferredPlane"):
-            v['@preferredPlane'] = str(v['@preferredPlane'])
-        
+        if key == "nodalPlanes" and dict_.get("@preferredPlane"):
+            dict_['@preferredPlane'] = str(dict_['@preferredPlane'])
+
         # USGS can't handle ID in content yet
-        if k == "waveformID":
-            devnull = v.pop('#text')
+        if key == "waveformID":
+            dict_.pop('#text')
 
         # Don't serialize empty stuff
-        if v is None:
+        if dict_ is None:
             return None
         # Caveat to that is, have to enforce QuakeML rules:
         #
         # arrival: must have phase
-        if k == "arrival" and isinstance(v, list):
-            v = [p for p in v if p.get('phase') is not None]
+        if key == "arrival" and isinstance(dict_, list):
+            dict_ = [p for p in dict_ if p.get('phase') is not None]
 
         # Round stuff TODO: move to decorator/method
-        if k == "depth":
-            self._round(v, 'value', -2)
-            self._round(v, 'uncertainty', -2)
+        if key == "depth":
+            self._round(dict_, 'value', -2)
+            self._round(dict_, 'uncertainty', -2)
             # TODO: lowerUncertainty, upperUncertainty, confidenceLevel??
-        elif k == "latitude":
-            self._round(v, 'uncertainty', 4)
-        elif k == "longitude":
-            self._round(v, 'uncertainty', 4)
-        elif k == "time":
-            self._round(v, 'uncertainty', 6)
-        elif k == "time":
-            self._round(v, 'uncertainty', 6)
-        elif k == "originUncertainty":
-            self._round(v, 'horizontalUncertainty', -1)
-            self._round(v, 'minHorizontalUncertainty', -1)
-            self._round(v, 'maxHorizontalUncertainty', -1)
-        elif k == "mag":
-            self._round(v, 'value', 1)
-            self._round(v, 'uncertainty', 2)
-        return k, v
-            
+        elif key == "latitude":
+            self._round(dict_, 'uncertainty', 4)
+        elif key == "longitude":
+            self._round(dict_, 'uncertainty', 4)
+        elif key == "time":
+            self._round(dict_, 'uncertainty', 6)
+        elif key == "time":
+            self._round(dict_, 'uncertainty', 6)
+        elif key == "originUncertainty":
+            self._round(dict_, 'horizontalUncertainty', -1)
+            self._round(dict_, 'minHorizontalUncertainty', -1)
+            self._round(dict_, 'maxHorizontalUncertainty', -1)
+        elif key == "mag":
+            self._round(dict_, 'value', 2)
+            self._round(dict_, 'uncertainty', 3)
+        return key, dict_
 
-def ignore_null(k, v):
+
+def ignore_null(key, value):
     """
     Preprocessor for xmltodict.unpasre that ignores keys with None value
     """
-    if v is None:
+    if value is None:
         return None
-    return k, v
+    return key, value
 
 
 def dumps(input_dict, *args, **kwargs):
@@ -265,11 +267,12 @@ def dumps(input_dict, *args, **kwargs):
     """
     return xmltodict.unparse(input_dict, *args, **kwargs)
 
+
 # TODO: add kwargs for typing/conversions???
-#
 def loads(xml_input, *args, **kwargs):
     """Load QML dict object from XML"""
     return xmltodict.parse(xml_input, *args, **kwargs)
+
 
 # Testing
 def main():
@@ -280,12 +283,13 @@ def main():
         qroot = loads(f)
     qml = qroot['q:quakeml']
 
-    te = TypeExtractor(qml) # extractor set with qml pulled from xmltodict
-    te.flatten(schema)  # build type schema map from xsd pulled from xmltodict
-    # 
-    q = te.extract_typed()
-    return q, te, schema
+    # extractor set with qml pulled from xmltodict
+    type_extractor = TypeExtractor(qml)
+    # build type schema map from xsd pulled from xmltodict
+    type_extractor.flatten(schema)
+
+    qml = type_extractor.extract_typed()
+    return qml, type_extractor, schema
 
 # Run test
-#q, te, schema = main()
-
+# q, te, schema = main()
