@@ -455,3 +455,14 @@ class Db2Quakeml(object):
             catalog['creationInfo']['agencyURI'] = "smi:{0}".format(self.doi)
         qmlroot = self._conv.qml(event_parameters=catalog)
         return qmlroot
+
+    def events2root(self, events):
+        """
+        Add event to parameters and root, append evid to publicID
+        """
+        catalog = self._conv.event_parameters(event=events)
+
+        if self.doi:
+            catalog['creationInfo']['agencyURI'] = "smi:{0}".format(self.doi)
+        qmlroot = self._conv.qml(event_parameters=catalog)
+        return qmlroot
