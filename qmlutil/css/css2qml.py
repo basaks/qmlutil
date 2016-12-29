@@ -61,9 +61,9 @@ TIMEDEF_WEIGHT = dict(d=1.0, n=0.0)
 ETYPE_MAP = {
     'qb': "quarry blast",
     'eq': "earthquake",
-    'me': "mining event",
+    'me': "rock burst",
     'ex': "explosion",
-    'o': "other event",
+    'o': "other",
     'l': "earthquake",
     'r': "earthquake",
     't': "earthquake",
