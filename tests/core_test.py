@@ -12,12 +12,12 @@ def test_resourceurigenerator():
 
     rid = make_rid('foo')
     assert rid == "smi:local/foo"
-    
+
     rid1 = make_rid("foo", "bar", schema="quakeml", authority_id="org.spam")
     assert rid1 == "quakeml:org.spam/foo#bar"
 
     make_rid2 = qml.ResourceURIGenerator(schema="quakeml", authority_id="org.spam")
-    
+
     rid2 = make_rid2("foo", "bar")
     assert rid1 == rid2
 
@@ -82,7 +82,7 @@ def test_anss_params():
     assert d['@catalog:dataid'] == "xx12345678"
     assert d['@catalog:datasource'] == "xx"
     assert d['@catalog:eventsource'] == "xx"
-    
+
 
 def test_extract_etype():
     """
@@ -149,8 +149,8 @@ def test_station_count():
     ]
     assert qml.station_count(arrivals, picks) == 2
     assert qml.station_count(arrivals, picks, used=True) == 1
-   
-        
+
+
 def test_qual_from_arrival():
     """
     Test calulating quality params from arrival data
@@ -211,7 +211,7 @@ def test_root():
 
     cinfo = ep.get('creationInfo', {})
     assert cinfo.get('creationTime') is not None
-    assert cinfo.get('version') is not None
+#    assert cinfo.get('version') is not None
     assert cinfo.get('agencyID') == "XX"
 
     qr = root.qml([], default_namespace="edu.unr.seismo")
@@ -225,5 +225,5 @@ def test_root():
     #TODO: check event2root
     #
 
-    
+
 

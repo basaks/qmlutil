@@ -62,7 +62,7 @@ def _dt2str(dt):
 
 class Parser(object):
     '''
-    Parse the NSL Icinose email output 
+    Parse the NSL Icinose email output
 
     '''
     line = []
@@ -74,7 +74,7 @@ class Parser(object):
         if isinstance(email_text, file):
             email_text = email_text.read()
         self.line = email_text.split(endline)
-    
+
     def _id(self, n):
         '''Pull out an integer ID'''
         return int(self.line[n].split(':')[-1])
@@ -88,7 +88,7 @@ class Parser(object):
         longitude = float(lon)
         orid = int(orid)
         return {'time': utctime, 'lat': latitude, 'lon': longitude, 'orid': orid }
-        
+
     def _depth(self, n):
         '''Stub'''
         depth = re.findall('\d+\.\d+', self.line[n])[0]
@@ -147,7 +147,7 @@ class Parser(object):
         perc = re.findall(r'(?:\d+\.\d+|\d+)\s?%',self.line[n])[0].split()[0]
         frac = float(perc)/100.
         return frac
-    
+
     def _epsilon(self, n):
         '''Pull out epsilon variance'''
         return float(self.line[n].split('=')[-1])
@@ -178,7 +178,7 @@ class Parser(object):
         plane1  = [float(x) for x in values1.split()]
         plane2  = [float(x) for x in values2.split()]
         return [plane1, plane2]
-    
+
     def _number_of_stations(self, n):
         '''
         Extracts number of defining stations used
@@ -200,7 +200,7 @@ class Parser(object):
         """
         p = self
         ichi = Dict()
-        
+
         # Maybe get rid of all this stuff...
         event         = Dict(event_type='earthquake')
         origin        = Dict()
@@ -230,7 +230,7 @@ class Parser(object):
             if 'Depth' in l:
                 ichi['derived_depth'] = p._depth(n)
             if 'Mw' in l:
-                ichi['mag'] = p._mw(n) 
+                ichi['mag'] = p._mw(n)
                 ichi['magtype'] = 'Mw'
             if 'Mo' in l and 'dyne' in l:
                 ichi['scalar_moment'] = p._mo(n)
@@ -262,7 +262,7 @@ class Parser(object):
                 ])
             if 'Spherical Coordinates' in l:
                 mt = p._mt_sphere(n)
-                
+
                 ichi['tensor'] = Dict([
                     ('Mrr', Dict(value=mt.get('Mrr'))),
                     ('Mtt', Dict(value=mt.get('Mtt'))),
@@ -276,7 +276,7 @@ class Parser(object):
                 t_axis = (ax['T']['trend'], ax['T']['plunge'], ax['T']['ev'])
                 p_axis = (ax['P']['trend'], ax['P']['plunge'], ax['P']['ev'])
                 n_axis = (ax['N']['trend'], ax['N']['plunge'], ax['N']['ev'])
-                
+
                 ichi['principal_axes'] = Dict([
                     ('tAxis', Dict([
                         ('azimuth', Dict(value = t_axis[0])),
@@ -303,7 +303,7 @@ class Parser(object):
                 ichi['azimuthal_gap'] = p._gap(n)
             if re.match(r'^Date', l):
                 ichi['creation_time'] = p._creation_time(n)
-        return ichi 
+        return ichi
 
 
 class IchinoseToQmlConverter(Root):
@@ -318,8 +318,8 @@ class IchinoseToQmlConverter(Root):
         Set event
         """
         self.parser = Parser(fh)
-        super(IchinoseToQmlConverter, self).__init__(*args, **kwargs) 
-         
+        super(IchinoseToQmlConverter, self).__init__(*args, **kwargs)
+
     def get_event(self, anss=False):
         """
         Build an obspy moment tensor focal mech event
@@ -350,7 +350,7 @@ class IchinoseToQmlConverter(Root):
         ichiID_rid = "{0}/{1}".format('ichinose', vers) # TODO: format/errcheck
         originID_rid = "{0}/{1}".format('origin', orid or uuid.uuid4())
         eventID_rid = "{0}/{1}".format('event', evid)
-        
+
         origin = Dict([
             ('@publicID', self._uri(ichiID_rid, local_id="origin")),
             ('latitude', _quan([
@@ -374,7 +374,7 @@ class IchinoseToQmlConverter(Root):
             ('evaluationStatus', ichi.get('status')),
             ('creationInfo', Dict([
                 ('creationTime', _dt2str(ichi.get('creation_time'))),
-                ('version', str(orid)),
+#                ('version', str(orid)),
                 ])
             ),
         ])
@@ -387,11 +387,11 @@ class IchinoseToQmlConverter(Root):
             ('evaluationStatus', ichi.get('status')),
             ('creationInfo', Dict([
                 ('creationTime', _dt2str(ichi.get('creation_time'))),
-                ('version', vers)
+#                ('version', vers)
                 ])
             ),
         ])
-        
+
         moment_tensor = Dict([
             ('@publicID', self._uri(ichiID_rid, local_id="mt")),
             ('derivedOriginID', origin.get('@publicID')),
@@ -410,11 +410,11 @@ class IchinoseToQmlConverter(Root):
             ),
             ('creationInfo', Dict([
                 ('creationTime', _dt2str(ichi.get('creation_time'))),
-                ('version', vers),
+#                ('version', vers),
                 ])
             ),
         ])
-        
+
         focal_mechanism = Dict([
             ('@publicID', self._uri(ichiID_rid, local_id="focalmech")),
             ('triggeringOriginID', self._uri(originID_rid)),
@@ -423,13 +423,13 @@ class IchinoseToQmlConverter(Root):
             ('momentTensor', moment_tensor),
             ('creationInfo', Dict([
                 ('creationTime', _dt2str(ichi.get('creation_time'))),
-                ('version', vers),
+#                ('version', vers),
                 ])
             ),
             ('evaluationMode', ichi.get('mode')),
             ('evaluationStatus', ichi.get('status')),
         ])
-        
+
         event = Dict([
             ('@publicID', self._uri(eventID_rid)),
             ('focalMechanism', [focal_mechanism]),
@@ -439,14 +439,14 @@ class IchinoseToQmlConverter(Root):
             ('preferredFocalMechanismID', focal_mechanism.get('@publicID')),
             ('creationInfo', Dict([
                 ('creationTime', _dt2str(ichi.get('creation_time'))),
-                ('version', str(evid)),
+#                ('version', str(evid)),
                 ])
             ),
         ])
         if anss:
             event.update(anss_params(self.agency, evid))
         return event
-        
+
 
 def mt2event(filehandle, rid_factory=None, agency=None, anss=False):
     """

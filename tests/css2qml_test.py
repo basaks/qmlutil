@@ -70,7 +70,7 @@ def test_map_origin():
     assert isclose(qmlo.get('depth', {}).get('uncertainty'), 2220.8)
     assert qmlo.get('time', {}).get('value') == "2015-12-29T14:03:42.273110Z"
     assert isclose(qmlo.get('time', {}).get('uncertainty'), 0.31)
-   
+
     assert extract_etype(qmlo) == "L"
 
     quality = qmlo.get('quality', {})
@@ -91,7 +91,7 @@ def test_map_origin():
     assert cinfo.get('agencyID') == "QQ"
     assert cinfo.get('author') == "BRTT:tom"
     # May not be string
-    #assert cinfo.get('version') == "1371545"
+    # assert cinfo.get('version') == "1371545"
     # Check time format against regex? or within X min of test time?
 
     # Check auto_authors
@@ -109,7 +109,7 @@ def test_map_netmag():
     """
     cssm = CSS_NETMAG2
     qmlm = CONV.map_netmag2magnitude(cssm)
-    
+
     assert '@publicID' in qmlm
     assert 'mag' in qmlm
 
@@ -118,11 +118,11 @@ def test_map_netmag():
     assert isclose(qmlm.get('mag', {}).get('uncertainty'), 0.19)
     assert qmlm.get('type') == "ml"
     assert qmlm.get('stationCount') == 5
-    
+
     assert qmlm.get('originID') == "quakeml:local.test/origin/1371545"
     assert qmlm.get('evaluationMode') == "manual"
     assert qmlm.get('evaluationStatus') == "reviewed"
-    
+
     # TODO: additional fields, creationInfo, etc
     cinfo = qmlm.get('creationInfo', {})
     assert cinfo.get('agencyID') == "QQ"
@@ -142,15 +142,15 @@ def test_map_originmag():
     assert qmlm.get('@publicID') == "quakeml:local.test/netmag/296149"
     assert isclose(qmlm.get('mag', {}).get('value'), 3.45)
     assert qmlm.get('type') == "ml"
-    
+
     assert qmlm.get('originID') == "quakeml:local.test/origin/1371545"
     assert qmlm.get('evaluationMode') == "manual"
     assert qmlm.get('evaluationStatus') == "reviewed"
-    
+
     cinfo = qmlm.get('creationInfo', {})
     assert cinfo.get('agencyID') == "QQ"
     assert cinfo.get('author') == "BRTT:tom"
-    
+
     # Case of no netmag UID
     csso2 = dict(csso)
     csso2['mlid'] = None
@@ -211,7 +211,7 @@ def test_map_mt():
     mt = qmlf.get('momentTensor', {})
     assert '@publicID' in mt
     assert 'derivedOriginID' in mt
-    
+
     assert qmlf.get('@publicID') == "quakeml:local.test/mt/105#focalmech"
     assert mt.get('@publicID') == "quakeml:local.test/mt/105#tensor"
 

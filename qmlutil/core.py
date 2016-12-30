@@ -269,7 +269,7 @@ class Root(object):
             ('creationInfo', Dict([
                 ('creationTime', self._utc(_ts(dtnow))),
                 ('agencyID', self.agency),
-                ('version', str(ustamp)),
+#                ('version', str(ustamp)),
                 ]))])
         for k in kwargs:
             if k in allowed:

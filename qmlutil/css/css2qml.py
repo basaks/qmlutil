@@ -317,7 +317,7 @@ class CSSToQMLConverter(Root):
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
                 ('author', posted_author),
-                ('version', db.get('orid')),
+#                ('version', db.get('orid')),
                 ])),
             ('comment', [Dict([
                 ('@id', self._uri(origin_rid, local_id="etype")),
@@ -360,7 +360,7 @@ class CSSToQMLConverter(Root):
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
                 ('author', db.get('auth')),
-                ('version', db.get('magid')),
+#                ('version', db.get('magid')),
                 ])),
             ('originID', self._uri(origin_rid)),
         ])
@@ -407,7 +407,7 @@ class CSSToQMLConverter(Root):
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
                 ('author', posted_author),
-                ('version', db.get('magid')),
+#                ('version', db.get('magid')),
                 ])),
         ])
         return magnitude
@@ -455,7 +455,7 @@ class CSSToQMLConverter(Root):
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
-                ('version', db.get('orid')),
+#                ('version', db.get('orid')),
                 ('author', author),
                 ])),
         ])
@@ -556,7 +556,7 @@ class CSSToQMLConverter(Root):
                                            db.get('lddate'))),
                 ('agencyID', self.agency),
                 ('author', db.get('auth')),
-                ('version', db.get('arid')),
+#                ('version', db.get('arid')),
                 ])),
             ('evaluationMode', pick_mode),
             ('evaluationStatus', pick_status),
@@ -607,7 +607,7 @@ class CSSToQMLConverter(Root):
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
-                ('version', db.get('arid')),
+#                ('version', db.get('arid')),
                 ])),
             # ('css:timedef', css_timedef),
         ])
@@ -711,7 +711,7 @@ class CSSToQMLConverter(Root):
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
                 ('author', author_string),
-                ('version', db.get('mtid')),
+#                ('version', db.get('mtid')),
                 ])),
             ('evaluationMode', mode),
             ('evaluationStatus', status),
@@ -774,7 +774,7 @@ class CSSToQMLConverter(Root):
                 ('creationTime', self._utc(db['lddate'])),
                 ('agencyID', self.agency),
                 ('author', db.get('auth')),
-                ('version', db.get('mtid')),
+#                ('version', db.get('mtid')),
                 ])),
         ])
 
@@ -820,7 +820,7 @@ class CSSToQMLConverter(Root):
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
                 ('author', db.get('auth')),
-                ('version', db.get('mtid')),
+#                ('version', db.get('mtid')),
                 ])),
             # These determined from auth?? or weird incorrect mt fields...
             ('evaluationMode', db.get('rstatus')),
@@ -912,7 +912,7 @@ class CSSToQMLConverter(Root):
             ('creationInfo', Dict([
                 ('creationTime', self._utc(lddate)),
                 ('agencyID', self.agency),
-                ('version', str(evid)),
+#                ('version', str(evid)),
                 ])),
         ])
         # Set the prefor if you gave on origin or the event table has one
