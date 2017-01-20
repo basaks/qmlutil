@@ -332,7 +332,14 @@ class CSSToQMLConverter(Root):
         """
         Map stamag record to StationMagnitude
         """
-        def_net = self.agency[:2].upper()
+        css_sta = db.get('sta')
+        css_chan = db.get('chan')
+        wf_rid = "{0}/{1}-{2}-{3}".format(
+            'wfdisc',
+            css_sta,
+            css_chan,
+            int(db.get('time') * 10**6),
+        )
         origin_rid = "{0}/{1}".format('origin',
                                       db.get('orid') or uuid.uuid4())
         stamag_rid = "{0}/{1}-{2}-{3}-{4}".format(
@@ -349,11 +356,12 @@ class CSSToQMLConverter(Root):
                 ('value', db.get('magnitude')),
                 ('uncertainty', db.get('uncertainty'))])),
             ('waveformID', Dict([
-                ('@stationCode', db.get('sta')),
-                ('@channelCode', db.get('chan') or ""),  # not in stamag
-                ('@networkCode', def_net),
-                ('@locationCode', db.get('loc') or ""),  # not in stamag
-                ('#text', self._uri(stamag_rid, schema="smi")),
+                ('@stationCode', db.get('fsta') or css_sta),
+                ('@channelCode', db.get('fchan') or css_chan),
+                ('@networkCode', db.get('snet') or self.def_net),
+                ('@locationCode', db.get('loc') or ""),
+                ('#text', self._uri(wf_rid, schema="smi")),
+                # 'resourceURI' in schema
                 ])),
             ('type', db.get('magtype')),
             ('creationInfo', Dict([
@@ -486,7 +494,6 @@ class CSSToQMLConverter(Root):
         ----
         arrival <- snetsta [sta] (outer) <- schanloc [sta chan] (outer)
         """
-        def_net = self.agency[:2].upper()
         css_sta = db.get('sta')
         css_chan = db.get('chan')
         wf_rid = "{0}/{1}-{2}-{3}".format(
@@ -535,7 +542,7 @@ class CSSToQMLConverter(Root):
             ('waveformID', Dict([
                 ('@stationCode', db.get('fsta') or css_sta),
                 ('@channelCode', db.get('fchan') or css_chan),
-                ('@networkCode', db.get('snet') or def_net),
+                ('@networkCode', db.get('snet') or self.def_net),
                 ('@locationCode', db.get('loc') or ""),
                 ('#text', self._uri(wf_rid, schema="smi")),
                 # 'resourceURI' in schema
