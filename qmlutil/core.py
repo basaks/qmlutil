@@ -205,7 +205,8 @@ class Root(object):
     """
     _auth_id = "local"  # default to use if rid_factory is N/A
 
-    agency = 'XX'       # agency ID, ususally net code
+    agency = 'XX'       # agency ID
+    default_network = 'XX'  # for use when network code is unknown
     doi = None          # DOI without scheme
     rid_factory = None  # ResourceURIGenerator function
     utc_factory = None  # function(timestamp: float)
