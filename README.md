@@ -36,13 +36,13 @@ Core
 * `qmlutil.xml` - Serialize a python QML structure (dicts + lists) to XML/QuakeML
 
 Require other python libs
-* `qmlutil.plugins.antelope` - Contains converter classes for Antelope CSS databases
+* `qmlutil.plugins.antelope_db` - Contains converter classes for Antelope CSS databases
 * `qmlutil.plugins.xml` - Contains classes for more advanced XML tasks that require libxml2
 
 Dependencies
 ------------
 There are no deps for core. The `plugins` modules have various vendor reqs:
-* The `antelope` plugin requires the proprietary `antelope` packages and NSL's `curds2` DBAPI driver
+* The `antelope_db` plugin requires the proprietary `antelope` packages and NSL's `curds2` DBAPI driver
 * The `xml` plugin requires the `lxml` package
 
 License

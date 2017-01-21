@@ -15,11 +15,12 @@
 # limitations under the License.
 #
 """
-qmlutil.plugins.antelope
+qmlutil.plugins.antelope_db
 
 Utillites for extracting data from Antelope -- 3rd party libs required
 """
 import os
+import sys
 import math
 import logging
 
@@ -27,6 +28,9 @@ from curds2.dbapi2 import connect
 from curds2.rows import OrderedDictRow
 
 import qmlutil as qml
+
+sys.path.append(os.environ['ANTELOPE'] + '/data/python')
+from antelope.datascope import DbprocessError
 
 
 class DatabaseConverter(object):
@@ -67,6 +71,10 @@ class DatabaseConverter(object):
                'dbsubset evid=={0}'.format(evid)]
         curs = self.connection.cursor()
         rec = curs.execute('process', [cmd])
+        try:
+            rec = curs.execute('process', [['dbjoin remark']])
+        except DbprocessError:
+            pass
         if rec:
             event = curs.fetchone()
             return self.converter.map_event(event, anss=anss)
@@ -75,9 +83,13 @@ class DatabaseConverter(object):
         """
         Get event from origin table (in case no event/prefor)
         """
-        cmd = ['dbopen origin', 'dbsubset orid=={0}'.format(orid)]
+        cmd = ['dbopen origin',
+               'dbsubset orid=={0}'.format(orid)]
+        comments = ['dbjoin remark']
         curs = self.connection.cursor()
-        rec = curs.execute('process', [cmd])
+        rec = curs.execute('process', [cmd + comments])
+        if rec <= 0:
+            rec = curs.execute('process', [cmd])
         if rec:
             event = curs.fetchone()
             return self.converter.map_event(event, anss=anss)
@@ -129,23 +141,33 @@ class DatabaseConverter(object):
 
         """
         if orid is not None:
-            substr = 'dbsubset orid=={0}'.format(orid)
+            select_origins = 'dbsubset orid=={0}'.format(orid)
         elif evid is not None:
-            substr = 'dbsubset evid=={0}'.format(evid)
+            select_origins = 'dbsubset evid=={0}'.format(evid)
         else:
             raise ValueError("Need to specify an ORID or EVID")
 
-        cmd = ['dbopen origin',
-               'dbjoin -o origerr', substr,
+        cmd = ['dbopen assoc',
+               'dbsort orid',
+               'dbgroup orid vmodel',
+               'dbjoin origin',
+               'dbjoin -o origerr',
+               select_origins,
                'dbsort -r lddate']
+        comments = ['dbjoin remark']
         curs = self.connection.cursor()
-        curs.execute('process', [cmd])
+        rec = curs.execute('process', [cmd + comments])
+        if rec <= 0:
+            curs.execute('process', [cmd])
         return self.converter.convert_origins(curs)
 
     def get_magnitudes(self, orid=None, evid=None):
         # pylint: disable=unused-argument
         """
         Return list of Magnitudes from ORID
+
+        Looks in both 'netmag' and 'origin' tables. Assumes everything found in
+        'netmag' table is in 'origin' table, but this may or may not be true.
 
         Inputs
         ------
@@ -154,29 +176,31 @@ class DatabaseConverter(object):
         Returns
         -------
         list of Magnitude types
-
-        Notes
-        -----
-        Right now, looks in 'netmag', then 'origin', and assumes anything in
-        netmag is in 'origin', that may or may not be true...
         """
         mags = []
         # TODO: try evid first
         # evid = self._evid(orid)
-        # substr = 'dbsubset evid=={0}'.format(evid)
-        substr = 'dbsubset orid=={0}'.format(orid)
+        # subset_string = 'dbsubset evid=={0}'.format(evid)
+        dbsubset_string = 'dbsubset orid=={0}'.format(orid)
 
         # 1. Check netmag table
+        net_mags = ['dbopen netmag',
+                    dbsubset_string,
+                    'dbsort -r lddate']
+        comments = ['dbjoin remark']
         curs = self.connection.cursor()
-        rec = curs.execute('process', [('dbopen netmag', substr,
-                                        'dbsort -r lddate')])
+        rec = curs.execute('process', [net_mags + comments])
+        if rec <= 0:
+            rec = curs.execute('process', [net_mags])
         if rec:
             mags += [self.converter.map_netmag2magnitude(db) for db in curs]
             return mags
 
         # 2. Check the origin table for the 3 types it holds
+        origin_mags = ['dbopen origin',
+                       dbsubset_string]
         curs = self.connection.cursor()
-        rec = curs.execute('process', [('dbopen origin', substr)])
+        rec = curs.execute('process', [origin_mags])
         if rec:
             db = curs.fetchone()
             mags += [self.converter.map_origin2magnitude(db, mtype=mtype)
@@ -186,7 +210,7 @@ class DatabaseConverter(object):
     def get_stamagnitudes(self, orid=None, evid=None):
         # pylint: disable=unused-argument
         """
-        Return list of Station Magnitudes from ORID
+        Return list of Station Magnitudes from ORID.
 
         Inputs
         ------
@@ -198,21 +222,27 @@ class DatabaseConverter(object):
 
         Notes
         -------
-        Tries to first join with remark table if available (not tested when
-        present)
-
+        WaveformStreamID is fully specified by joining with arrival, snetsta
+        and schanloc tables. Joins comments from remark table.
         """
         stamags = []
+        cmd = ['dbopen stamag',
+               'dbsubset orid=={0}'.format(orid),
+               'dbsort -r lddate']
+        wfids = ['dbjoin arrival',
+                 'dbjoin -o snetsta',
+                 'dbjoin -o schanloc sta chan']
+        comments = ['dbjoin remark']
+
         curs = self.connection.cursor()
-        cmd = ['dbopen stamag', 'dbsubset orid=={0}'.format(orid),
-               'dbjoin remark', 'dbsort -r lddate']
-        rec = curs.execute('process', [cmd])
-        if rec <= 0:
+        rec = curs.execute('process', [cmd + wfids + comments])
+        if not rec:
+            rec = curs.execute('process', [cmd + wfids])
+        if not rec:
             curs = self.connection.cursor()
-            cmd = ['dbopen stamag', 'dbsubset orid=={0}'.format(orid),
-                   'dbsort -r lddate']
+            rec = curs.execute('process', [cmd + comments])
+        if not rec:
             rec = curs.execute('process', [cmd])
-        if rec:
             stamags += ([self.converter.map_stamag2stationmagnitude(db)
                          for db in curs])
             return stamags
@@ -234,11 +264,16 @@ class DatabaseConverter(object):
         arrivals :  list of Arrival types
 
         """
-        cmd = ['dbopen assoc', 'dbsubset orid=={0}'.format(orid),
-               'dbjoin arrival', 'dbjoin -o snetsta',
+        cmd = ['dbopen assoc',
+               'dbsubset orid=={0}'.format(orid),
+               'dbjoin arrival',
+               'dbjoin -o snetsta',
                'dbjoin -o schanloc sta chan']
+        comments = ['dbjoin remark']
         curs = self.connection.cursor()
-        curs.execute('process', [cmd])
+        rec = curs.execute('process', [cmd + comments])
+        if not rec:
+            curs.execute('process', [cmd])
         return self.converter.convert_phases(curs)
 
     def extract_origin(self, orid, origin=True, magnitude=True, pick=False,
@@ -267,17 +302,17 @@ class DatabaseConverter(object):
             if origin and picks_arrivals:
                 _picks, _arrivals = picks_arrivals
                 event['pick'] = _picks
-                try:
-                    event['origin'][0]['arrival'] = _arrivals
-                except Exception as ex:
-                    pass  # log no origin
+                # try:
+                event['origin'][0]['arrival'] = _arrivals
+                # except Exception as ex:
+                #     pass  # log no origin
                 # TODO: more stuff -- derive from arrivals, e.g stationCount
                 for origin in event.get('origin', []):
                     try:
                         # o['quality'] = in case none yet???
                         origin.get('quality', {}).update(
                             qml.get_quality_from_arrival(origin['arrival']))
-                    except Exception as ex:
+                    except DbprocessError:
                         pass
         if focal_mechanism:
             event['focalMechanism'] = self.get_mts(orid) + \
@@ -351,7 +386,8 @@ class Db2Quakeml(object):
         self._prefmags = mtypes
 
     def __init__(self, doi=None, authority_id="local", agency_id="XX",
-                 automatic_authors=[], etype_map={}, placesdb=None, **kwargs):
+                 default_network="XX", automatic_authors=['oa', 'orbassoc'],
+                 etype_map={}, placesdb=None, **kwargs):
         """
         Initialize converter with config from keyword args
         """
@@ -365,6 +401,7 @@ class Db2Quakeml(object):
         # Make Converter
         self._conv = qml.CSSToQMLConverter(
             agency=agency_id,
+            default_network=default_network,
             rid_factory=qml.ResourceURIGenerator("quakeml", authority_id),
             utc_factory=qml.timestamp2isostr,
             etype_map=etype_map,
@@ -385,7 +422,7 @@ class Db2Quakeml(object):
                 event = db.get_event(orid=orid, evid=evid, anss=anss)
             if event is None:
                 raise ValueError("Event not found")
-        except Exception as ex:
+        except DbprocessError:
             event = self._conv.map_event({'evid': evid}, anss=anss)
         finally:
             event['type'] = "not existing"
