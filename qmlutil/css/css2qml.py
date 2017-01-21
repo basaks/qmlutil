@@ -58,6 +58,7 @@ from qmlutil import Dict, Root, anss_params
 TIMEDEF_WEIGHT = dict(d=1.0, n=0.0)
 
 # Default CSS3.0 etypes to QML event types
+# TODO: update to support IASPEI 2-letter coding of type & certainty
 ETYPE_MAP = {
     'qb': "quarry blast",
     'eq': "earthquake",
@@ -169,44 +170,14 @@ def extract_etype(origin):
                     return comm.get('text')
 
 
-def split_auth(auth, recognized_magnitudes=('mb', 'ml', 'mn', 'mw', 'mwb',
-                                            'mwp', 'mwr', 'mww', ' m')):
-    '''
-    Splits an Antelope 'auth' string into its component parts.
-    Anything prior to a colon is considered the agency.
-    An attempt is made to strip trailing magnitude types.
-
-    :returns: agencies, authors, magnitude_types
-    '''
-    if auth is None:
-        return None, None, None
-    if ':' in auth:
-        agency, author = auth.split(':', 1)
-    else:
-        agency, author = '', auth
-    agency = agency.strip()
-    author = author.strip()
-
-    magnitude_types = []
-    while any([author[-len(recognized_magnitude):].lower() ==
-               recognized_magnitude.lower()
-               for recognized_magnitude in recognized_magnitudes]):
-        for recognized_magnitude in recognized_magnitudes:
-            magnitude_type = author[-len(recognized_magnitude):]
-            if magnitude_type.lower() == recognized_magnitude.lower():
-                magnitude_types += [magnitude_type]
-                author = author[:len(author) - len(recognized_magnitude)]
-                author = author.strip()
-    return agency, author, magnitude_types
-
-
 class CSSToQMLConverter(Root):
     """
     Converter to QuakeML schema from CSS3.0 schema
 
     Attributes
     ----------
-    agency  : str of short agency identifier (net code)
+    agency  : str to use when agency can't be inferred from author
+    default_network  : str to use when waveform identifier is missing network
     automatic_authors : list of authors to mark as "auto"
     rid_factory : ResourceUIDGenerator function which returns ID's
     utc_factory : function that converts a float timestamp
@@ -265,7 +236,7 @@ class CSSToQMLConverter(Root):
         status = "reviewed"
         return mode, status
 
-    def get_method_model(algorithm):
+    def get_method_model(self, algorithm):
         """
         Return method and model based on algorithm
         """
@@ -283,10 +254,57 @@ class CSSToQMLConverter(Root):
         else:
             quality = ''
 
-        method_id = "{0}/{1}".format('method', method)
-        model_id = "{0}/{1}".format('model', model)
+        method_rid = "{0}/{1}".format('method', method)
 
-        return method_id, model_id, quality
+        return method_rid, model, quality
+
+    def split_auth(self, auth,
+                   recognized_magnitudes=('mb', 'ml', 'mn', 'mw', 'mwb',
+                                          'mwp', 'mwr', 'mww', ' m')):
+        '''
+        Splits an Antelope 'auth' string into its component parts.
+        Anything prior to a colon is considered the agency.
+        An attempt is made to strip trailing magnitude types.
+
+        :returns: agency, author, magnitude_types, method, info
+        '''
+        if auth is None:
+            return None, None, None, None, None
+
+        # usage for picks in arrival table
+        if 'dbp' in auth:
+            method, author, info = auth.split(':', 2)
+            return None, author, None, method, info
+
+        # usage in amplitudes in arrival table, netmag and stamag table
+        if 'dbevproc' in auth:
+            if ':' in auth:
+                method, info = auth.split(':', 1)
+            else:
+                method, info = auth, None
+            return None, None, None, method, info
+
+        # usage in origin table and magnitudes from foreign agencies
+        if ':' in auth:
+            agency, author = auth.split(':', 1)
+        else:
+            agency, author = '', auth
+        agency = agency.strip()
+        author = author.strip()
+
+        # deal with silly concatenation of magnitudes onto auth field
+        magnitude_types = []
+        while any([author[-len(recognized_magnitude):].lower() ==
+                   recognized_magnitude.lower()
+                   for recognized_magnitude in recognized_magnitudes]):
+            for recognized_magnitude in recognized_magnitudes:
+                magnitude_type = author[-len(recognized_magnitude):]
+                if magnitude_type.lower() == recognized_magnitude.lower():
+                    magnitude_types += [magnitude_type]
+                    author = author[:len(author) - len(recognized_magnitude)]
+                    author = author.strip()
+        magnitude_types = []
+        return agency, author, magnitude_types, None, None
 
     def map_origin2origin(self, db):
         """
@@ -310,8 +328,10 @@ class CSSToQMLConverter(Root):
         origin <- origerr [orid] (outer)
         """
         css_etype = _str(db.get('etype'))
-        agency, author, _ = split_auth(_str(db.get('auth')))
-        method_rid, model_rid, _ = self.get_method_model(_str(db.get('algorithm')))
+        agency, author, _, _, _ = self.split_auth(_str(db.get('auth')))
+        method_rid, model, _ = self.get_method_model(_str(db.get('algorithm')))
+        model_rid = "{0}/{1}".format('vmodel',
+                                     db.get('vmodel') or model or uuid.uuid4())
 
         mode, status = self.get_event_status(author)
         agency if agency is not '' else self.agency
@@ -368,8 +388,8 @@ class CSSToQMLConverter(Root):
                 ('associatedPhaseCount', db.get('nass')),
                 ])),
             ('originUncertainty', uncertainty),
-            ('methodID', self._uri(method_rid)),
-            ('earthModelID', self._uri(model_rid)),
+            ('methodID', self._uri(method_rid, schema="smi")),
+            ('earthModelID', self._uri(model_rid, schema="smi")),
             ('evaluationMode', mode),
             ('evaluationStatus', status),
             ('creationInfo', Dict([
@@ -378,7 +398,7 @@ class CSSToQMLConverter(Root):
                 ('author', author),
                 # ('version', db.get('orid')),
                 ])),
-            ('comment', [Dict([
+            ('comment', [Dict([  # TODO: move this to extra info
                 ('@id', self._uri(origin_rid, local_id="etype")),
                 ('text', css_etype),
                 ])]),
@@ -391,7 +411,7 @@ class CSSToQMLConverter(Root):
         """
         Map stamag record to StationMagnitude
         """
-        agency, author, _ = split_auth(_str(db.get('auth')))
+        agency, author, _, method, info = self.split_auth(_str(db.get('auth')))
 
         css_sta = db.get('sta')
         css_chan = db.get('chan')
@@ -453,8 +473,7 @@ class CSSToQMLConverter(Root):
         Any object that supports the dict 'get' method can be passed as
         input, e.g. OrderedDict, custom classes, etc.
         """
-        # TODO: add station_magnitude_contributions
-        agency, author, _ = split_auth(_str(db.get('auth')))
+        agency, author, _, method, info = self.split_auth(_str(db.get('auth')))
         mode, status = self.get_event_status(author)
 
         origin_rid = "{0}/{1}".format('origin',
@@ -475,7 +494,7 @@ class CSSToQMLConverter(Root):
             ('evaluationStatus', status),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', agency if agency != '' else self.agency),
+                ('agencyID', agency or self.agency),
                 ('author', author),
                 # ('version', db.get('magid')),
                 ])),
@@ -501,7 +520,7 @@ class CSSToQMLConverter(Root):
         Any object that supports the dict 'get' method can be passed as
         input, e.g. OrderedDict, custom classes, etc.
         """
-        agency, author, _ = split_auth(_str(db.get('auth')))
+        agency, author, _, _, _ = self.split_auth(_str(db.get('auth')))
         mode, status = self.get_event_status(author)
 
         origin_rid = "{0}/{1}".format('origin',
@@ -525,7 +544,7 @@ class CSSToQMLConverter(Root):
             ('evaluationStatus', status),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', agency if agency != '' else self.agency),
+                ('agencyID', agency or self.agency),
                 ('author', author),
                 # ('version', db.get('orid')),
                 ])),
@@ -557,8 +576,7 @@ class CSSToQMLConverter(Root):
         ----
         arrival <- snetsta [sta] (outer) <- schanloc [sta chan] (outer)
         """
-        agency, author, _ = split_auth(_str(db.get('auth')))
-        mode, status = self.get_event_status(author)
+        agency, author, _, method, info = self.split_auth(_str(db.get('auth')))
 
         css_sta = db.get('sta')
         css_chan = db.get('chan')
@@ -591,6 +609,14 @@ class CSSToQMLConverter(Root):
         else:
             polarity = None
 
+        mode = "automatic"
+        if 'orbassoc' not in _str(db.get('auth')):
+            mode = "manual"
+
+        status = "preliminary"
+        if mode is "manual":
+            status = "reviewed"
+
         pick = Dict([
             ('@publicID', self._uri(pick_rid)),
             ('time', _quan([
@@ -619,7 +645,7 @@ class CSSToQMLConverter(Root):
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('arrival.lddate') or
                                            db.get('lddate'))),
-                ('agencyID', agency if agency != '' else self.agency),
+                ('agencyID', agency or self.agency),
                 ('author', author),
                 # ('version', db.get('arid')),
                 ])),
@@ -652,13 +678,11 @@ class CSSToQMLConverter(Root):
         css_timedef = _str(db.get('timedef'))
         pick_rid = "{0}/{1}".format('arrival',
                                     db.get('arid') or uuid.uuid4())
-        vmodel_rid = "{0}/{1}".format('vmodel',
-                                      db.get('vmodel') or uuid.uuid4())
-        assoc_rid = "{0}/{1}-{2}".format(
-            'assoc',
-            db.get('orid') or uuid.uuid4(),
-            db.get('arid') or uuid.uuid4(),
-        )
+        model_rid = "{0}/{1}".format('vmodel',
+                                     db.get('vmodel') or uuid.uuid4())
+        assoc_rid = "{0}/{1}-{2}".format('assoc',
+                                         db.get('orid') or uuid.uuid4(),
+                                         db.get('arid') or uuid.uuid4())
 
         arrival = Dict([
             ('@publicID', self._uri(assoc_rid)),
@@ -668,7 +692,7 @@ class CSSToQMLConverter(Root):
             ('distance', db.get('delta')),
             ('timeResidual', db.get('timeres')),
             ('timeWeight', db.get('wgt')),
-            ('earthModelID', self._uri(vmodel_rid, schema="smi")),
+            ('earthModelID', self._uri(model_rid, schema="smi")),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
@@ -711,6 +735,8 @@ class CSSToQMLConverter(Root):
         arrival = self.map_assoc2arrival(db)
         return (pick, arrival)
 
+    # TODO: amplitudes & station magnitude contributions
+
     def map_fplane2focalmech(self, db):
         """
         Return a dict of focalMechanism from an dict of CSS key/values
@@ -738,7 +764,7 @@ class CSSToQMLConverter(Root):
         fplane_rid = "{0}/{1}".format('fplane',
                                       db.get('mechid') or uuid.uuid4())
 
-        agency, author, _ = split_auth(_str(db.get('auth')))
+        agency, author, _, _, _ = self.split_auth(_str(db.get('auth')))
         mode, status = self.get_event_status(author)
         method_rid = self.get_method_model(_str(db.get('algorithm')))[0]
 
@@ -813,7 +839,7 @@ class CSSToQMLConverter(Root):
         mt_rid = "{0}/{1}".format('mt',
                                   db.get('mtid') or uuid.uuid4())
 
-        agency, author, _ = split_auth(_str(db.get('auth')))
+        agency, author, _, _, _ = self.split_auth(_str(db.get('auth')))
 
         moment_tensor = Dict([
             ('@publicID', self._uri(mt_rid, local_id="tensor")),
