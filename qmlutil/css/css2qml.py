@@ -75,7 +75,7 @@ def _dt(timestamp):
     """Returns the UTC dateTime"""
     try:
         return datetime.datetime.utcfromtimestamp(timestamp)
-    except Exception as ex:
+    except ValueError as ex:  # pylint:disable=unused-variable
         return None
 
 
@@ -169,6 +169,37 @@ def extract_etype(origin):
                     return comm.get('text')
 
 
+def split_auth(auth, recognized_magnitudes=('mb', 'ml', 'mn', 'mw', 'mwb',
+                                            'mwp', 'mwr', 'mww', ' m')):
+    '''
+    Splits an Antelope 'auth' string into its component parts.
+    Anything prior to a colon is considered the agency.
+    An attempt is made to strip trailing magnitude types.
+
+    :returns: agencies, authors, magnitude_types
+    '''
+    if auth is None:
+        return None, None, None
+    if ':' in auth:
+        agency, author = auth.split(':', 1)
+    else:
+        agency, author = '', auth
+    agency = agency.strip()
+    author = author.strip()
+
+    magnitude_types = []
+    while any([author[-len(recognized_magnitude):].lower() ==
+               recognized_magnitude.lower()
+               for recognized_magnitude in recognized_magnitudes]):
+        for recognized_magnitude in recognized_magnitudes:
+            magnitude_type = author[-len(recognized_magnitude):]
+            if magnitude_type.lower() == recognized_magnitude.lower():
+                magnitude_types += [magnitude_type]
+                author = author[:len(author) - len(recognized_magnitude)]
+                author = author.strip()
+    return agency, author, magnitude_types
+
+
 class CSSToQMLConverter(Root):
     """
     Converter to QuakeML schema from CSS3.0 schema
@@ -234,6 +265,29 @@ class CSSToQMLConverter(Root):
         status = "reviewed"
         return mode, status
 
+    def get_method_model(algorithm):
+        """
+        Return method and model based on algorithm
+        """
+        if algorithm is None:
+            return None, None, None
+
+        if ':' in algorithm:
+            method, model = algorithm.split(':', 1)
+        else:
+            method, model = 'grassoc', algorithm
+
+        if '(' in model and ')' in model:
+            model, quality = model.split('(')
+            quality = quality.split(')')[0]
+        else:
+            quality = ''
+
+        method_id = "{0}/{1}".format('method', method)
+        model_id = "{0}/{1}".format('model', model)
+
+        return method_id, model_id, quality
+
     def map_origin2origin(self, db):
         """
         Return a dict of QuakeML origin from a dict of CSS key/values
@@ -256,8 +310,11 @@ class CSSToQMLConverter(Root):
         origin <- origerr [orid] (outer)
         """
         css_etype = _str(db.get('etype'))
-        posted_author = _str(db.get('auth'))
-        mode, status = self.get_event_status(posted_author)
+        agency, author, _ = split_auth(_str(db.get('auth')))
+        method_rid, model_rid, _ = self.get_method_model(_str(db.get('algorithm')))
+
+        mode, status = self.get_event_status(author)
+        agency if agency is not '' else self.agency
         origin_rid = "{0}/{1}".format('origin',
                                       db.get('orid') or uuid.uuid4())
 
@@ -311,13 +368,15 @@ class CSSToQMLConverter(Root):
                 ('associatedPhaseCount', db.get('nass')),
                 ])),
             ('originUncertainty', uncertainty),
+            ('methodID', self._uri(method_rid)),
+            ('earthModelID', self._uri(model_rid)),
             ('evaluationMode', mode),
             ('evaluationStatus', status),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', self.agency),
-                ('author', posted_author),
-#                ('version', db.get('orid')),
+                ('agencyID', agency),
+                ('author', author),
+                # ('version', db.get('orid')),
                 ])),
             ('comment', [Dict([
                 ('@id', self._uri(origin_rid, local_id="etype")),
@@ -332,6 +391,8 @@ class CSSToQMLConverter(Root):
         """
         Map stamag record to StationMagnitude
         """
+        agency, author, _ = split_auth(_str(db.get('auth')))
+
         css_sta = db.get('sta')
         css_chan = db.get('chan')
         wf_rid = "{0}/{1}-{2}-{3}".format(
@@ -358,7 +419,7 @@ class CSSToQMLConverter(Root):
             ('waveformID', Dict([
                 ('@stationCode', db.get('fsta') or css_sta),
                 ('@channelCode', db.get('fchan') or css_chan),
-                ('@networkCode', db.get('snet') or self.def_net),
+                ('@networkCode', db.get('snet') or self.default_network),
                 ('@locationCode', db.get('loc') or ""),
                 ('#text', self._uri(wf_rid, schema="smi")),
                 # 'resourceURI' in schema
@@ -366,9 +427,9 @@ class CSSToQMLConverter(Root):
             ('type', db.get('magtype')),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', self.agency),
-                ('author', db.get('auth')),
-#                ('version', db.get('magid')),
+                ('agencyID', agency if agency != '' else self.agency),
+                ('author', author),
+                # ('version', db.get('magid')),
                 ])),
             ('originID', self._uri(origin_rid)),
         ])
@@ -393,8 +454,9 @@ class CSSToQMLConverter(Root):
         input, e.g. OrderedDict, custom classes, etc.
         """
         # TODO: add station_magnitude_contributions
-        posted_author = _str(db.get('auth'))
-        mode, status = self.get_event_status(posted_author)
+        agency, author, _ = split_auth(_str(db.get('auth')))
+        mode, status = self.get_event_status(author)
+
         origin_rid = "{0}/{1}".format('origin',
                                       db.get('orid') or uuid.uuid4())
         netmag_rid = "{0}/{1}".format('netmag',
@@ -413,9 +475,9 @@ class CSSToQMLConverter(Root):
             ('evaluationStatus', status),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', self.agency),
-                ('author', posted_author),
-#                ('version', db.get('magid')),
+                ('agencyID', agency if agency != '' else self.agency),
+                ('author', author),
+                # ('version', db.get('magid')),
                 ])),
         ])
         return magnitude
@@ -439,8 +501,9 @@ class CSSToQMLConverter(Root):
         Any object that supports the dict 'get' method can be passed as
         input, e.g. OrderedDict, custom classes, etc.
         """
-        author = _str(db.get('auth'))
+        agency, author, _ = split_auth(_str(db.get('auth')))
         mode, status = self.get_event_status(author)
+
         origin_rid = "{0}/{1}".format('origin',
                                       db.get('orid') or uuid.uuid4())
 
@@ -462,9 +525,9 @@ class CSSToQMLConverter(Root):
             ('evaluationStatus', status),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', self.agency),
-#                ('version', db.get('orid')),
+                ('agencyID', agency if agency != '' else self.agency),
                 ('author', author),
+                # ('version', db.get('orid')),
                 ])),
         ])
         return magnitude
@@ -494,6 +557,9 @@ class CSSToQMLConverter(Root):
         ----
         arrival <- snetsta [sta] (outer) <- schanloc [sta chan] (outer)
         """
+        agency, author, _ = split_auth(_str(db.get('auth')))
+        mode, status = self.get_event_status(author)
+
         css_sta = db.get('sta')
         css_chan = db.get('chan')
         wf_rid = "{0}/{1}-{2}-{3}".format(
@@ -525,14 +591,6 @@ class CSSToQMLConverter(Root):
         else:
             polarity = None
 
-        pick_mode = "automatic"
-        if 'orbassoc' not in _str(db.get('auth')):
-            pick_mode = "manual"
-
-        pick_status = "preliminary"
-        if pick_mode is "manual":
-            pick_status = "reviewed"
-
         pick = Dict([
             ('@publicID', self._uri(pick_rid)),
             ('time', _quan([
@@ -542,7 +600,7 @@ class CSSToQMLConverter(Root):
             ('waveformID', Dict([
                 ('@stationCode', db.get('fsta') or css_sta),
                 ('@channelCode', db.get('fchan') or css_chan),
-                ('@networkCode', db.get('snet') or self.def_net),
+                ('@networkCode', db.get('snet') or self.default_network),
                 ('@locationCode', db.get('loc') or ""),
                 ('#text', self._uri(wf_rid, schema="smi")),
                 # 'resourceURI' in schema
@@ -561,12 +619,12 @@ class CSSToQMLConverter(Root):
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('arrival.lddate') or
                                            db.get('lddate'))),
-                ('agencyID', self.agency),
-                ('author', db.get('auth')),
-#                ('version', db.get('arid')),
+                ('agencyID', agency if agency != '' else self.agency),
+                ('author', author),
+                # ('version', db.get('arid')),
                 ])),
-            ('evaluationMode', pick_mode),
-            ('evaluationStatus', pick_status),
+            ('evaluationMode', mode),
+            ('evaluationStatus', status),
         ])
         return pick
 
@@ -614,7 +672,7 @@ class CSSToQMLConverter(Root):
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
                 ('agencyID', self.agency),
-#                ('version', db.get('arid')),
+                # ('version', db.get('arid')),
                 ])),
             # ('css:timedef', css_timedef),
         ])
@@ -679,10 +737,10 @@ class CSSToQMLConverter(Root):
                                       db.get('orid') or uuid.uuid4())
         fplane_rid = "{0}/{1}".format('fplane',
                                       db.get('mechid') or uuid.uuid4())
-        author_string = ':'.join([db.get('algorithm'), db.get('auth')])
 
-        # Determine from auth field
-        mode, status = self.get_event_status(_str(db.get('auth')))
+        agency, author, _ = split_auth(_str(db.get('auth')))
+        mode, status = self.get_event_status(author)
+        method_rid = self.get_method_model(_str(db.get('algorithm')))[0]
 
         nodal_planes = Dict([
             ('nodalPlane1', Dict([
@@ -716,12 +774,13 @@ class CSSToQMLConverter(Root):
             ('principalAxes', principal_axes),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', self.agency),
-                ('author', author_string),
-#                ('version', db.get('mtid')),
+                ('agencyID', agency if agency != '' else self.agency),
+                ('author', author),
+                # ('version', db.get('mtid')),
                 ])),
             ('evaluationMode', mode),
             ('evaluationStatus', status),
+            ('methodID', self._uri(method_rid)),
         ])
         return focal_mechanism
 
@@ -754,15 +813,7 @@ class CSSToQMLConverter(Root):
         mt_rid = "{0}/{1}".format('mt',
                                   db.get('mtid') or uuid.uuid4())
 
-        # This is wrong in the GS feed, have to map to valid QuakeML enum
-        # the right place for this is Quakeml -> mt table, but do it here
-        # in case no one did on ETL.
-        # mode = dict([
-        #     ('automatic', "automatic"),
-        #     ('manual', "manual"),
-        #     ('reviewed', "manual"),
-        # ]).get(db.get('rstatus'))  # should be EvaluationModeType
-        # status = db.get('estatus')  # should be EvaluationStatusType
+        agency, author, _ = split_auth(_str(db.get('auth')))
 
         moment_tensor = Dict([
             ('@publicID', self._uri(mt_rid, local_id="tensor")),
@@ -780,8 +831,8 @@ class CSSToQMLConverter(Root):
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db['lddate'])),
                 ('agencyID', self.agency),
-                ('author', db.get('auth')),
-#                ('version', db.get('mtid')),
+                ('author', author),
+                # ('version', db.get('mtid')),
                 ])),
         ])
 
@@ -825,9 +876,9 @@ class CSSToQMLConverter(Root):
             ('momentTensor', moment_tensor),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', self.agency),
-                ('author', db.get('auth')),
-#                ('version', db.get('mtid')),
+                ('agencyID', agency if agency != '' else self.agency),
+                ('author', author),
+                # ('version', db.get('mtid')),
                 ])),
             # These determined from auth?? or weird incorrect mt fields...
             ('evaluationMode', db.get('rstatus')),
@@ -919,7 +970,7 @@ class CSSToQMLConverter(Root):
             ('creationInfo', Dict([
                 ('creationTime', self._utc(lddate)),
                 ('agencyID', self.agency),
-#                ('version', str(evid)),
+                # ('version', str(evid)),
                 ])),
         ])
         # Set the prefor if you gave on origin or the event table has one
