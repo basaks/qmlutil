@@ -65,16 +65,16 @@ class DatabaseConverter(object):
         """
         Get event from event table
         """
-        if orid and not evid:
+        if evid is None and orid is not None:
             evid = self._evid(orid)
         cmd = ['dbopen event',
                'dbsubset evid=={0}'.format(evid)]
+
+        comments = ['dbjoin remark']
         curs = self.connection.cursor()
-        rec = curs.execute('process', [cmd])
-        try:
-            rec = curs.execute('process', [['dbjoin remark']])
-        except DbprocessError:
-            pass
+        rec = curs.execute('process', [cmd + comments])
+        if rec <= 0:
+            rec = curs.execute('process', [cmd])
         if rec:
             event = curs.fetchone()
             return self.converter.map_event(event, anss=anss)
@@ -386,7 +386,7 @@ class Db2Quakeml(object):
         self._prefmags = mtypes
 
     def __init__(self, doi=None, authority_id="local", agency_id="XX",
-                 default_network="XX", automatic_authors=['oa', 'orbassoc'],
+                 default_network="XX", automatic_authors=('oa', 'orbassoc'),
                  etype_map={}, placesdb=None, **kwargs):
         """
         Initialize converter with config from keyword args
