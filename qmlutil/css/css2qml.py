@@ -76,7 +76,7 @@ def _dt(timestamp):
     """Returns the UTC dateTime"""
     try:
         return datetime.datetime.utcfromtimestamp(timestamp)
-    except ValueError as ex:  # pylint:disable=unused-variable
+    except ValueError as ex:  # analysis:ignore
         return None
 
 
