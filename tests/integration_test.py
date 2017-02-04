@@ -45,7 +45,7 @@ def test_noprefor():
     import logging
     from qmlutil import dumps, Rounder
     from qmlutil.plugins.xml import validate
-    from qmlutil.plugins.antelope import Db2Quakeml
+    from qmlutil.plugins.antelope_db import Db2Quakeml
     #from qmlutil.ichinose import IchinoseToQmlConverter
 
     # Preprocessor for XML serialization
@@ -58,7 +58,7 @@ def test_noprefor():
 
     # Convert and check for everything we asked for (ANSS, phases, etc)
     logging.basicConfig() # config root logger TODO: change to module logger:
-    # 'qmlutil.plugins.antelope'
+    # 'qmlutil.plugins.antelope_db'
     conv = Db2Quakeml(**CFG)
     # ------------------------------------------------------------------------
     # Test event generation
@@ -93,7 +93,7 @@ def test_nullphase():
     import logging
     from qmlutil import dumps, Rounder
     from qmlutil.plugins.xml import validate
-    from qmlutil.plugins.antelope import Db2Quakeml
+    from qmlutil.plugins.antelope_db import Db2Quakeml
     #from qmlutil.ichinose import IchinoseToQmlConverter
 
     # Preprocessor for XML serialization
@@ -106,7 +106,7 @@ def test_nullphase():
 
     # Convert and check for everything we asked for (ANSS, phases, etc)
     logging.basicConfig() # config root logger TODO: change to mudule logger:
-    # 'qmlutil.plugins.antelope'
+    # 'qmlutil.plugins.antelope_db'
     conv = Db2Quakeml(**CFG)
     # ------------------------------------------------------------------------
     # Test event generation
@@ -142,7 +142,7 @@ def test_db2qml():
     import logging
     from qmlutil import dumps, Rounder
     from qmlutil.plugins.xml import validate
-    from qmlutil.plugins.antelope import Db2Quakeml
+    from qmlutil.plugins.antelope_db import Db2Quakeml
     from qmlutil.ichinose import IchinoseToQmlConverter
 
     # Preprocessor for XML serialization
@@ -155,7 +155,7 @@ def test_db2qml():
 
     # Convert and check for everything we asked for (ANSS, phases, etc)
     logging.basicConfig() # config root logger TODO: change to mudule logger:
-    # 'qmlutil.plugins.antelope'
+    # 'qmlutil.plugins.antelope_db'
     conv = Db2Quakeml(**CFG)
 
     # ------------------------------------------------------------------------
