@@ -494,7 +494,7 @@ class CSSToQMLConverter(Root):
             ('evaluationStatus', status),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', agency or self.agency),
+                ('agencyID', self.agency or agency),
                 ('author', author),
                 # ('version', db.get('magid')),
                 ])),
@@ -544,7 +544,7 @@ class CSSToQMLConverter(Root):
             ('evaluationStatus', status),
             ('creationInfo', Dict([
                 ('creationTime', self._utc(db.get('lddate'))),
-                ('agencyID', agency or self.agency),
+                ('agencyID', self.agency or agency),
                 ('author', author),
                 # ('version', db.get('orid')),
                 ])),

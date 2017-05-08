@@ -126,7 +126,7 @@ def test_map_netmag():
     # TODO: additional fields, creationInfo, etc
     cinfo = qmlm.get('creationInfo', {})
     assert cinfo.get('agencyID') == "QQ"
-    assert cinfo.get('author') == "dbml:tom"
+    assert cinfo.get('author') == "tom"
 
 
 def test_map_originmag():
@@ -149,7 +149,7 @@ def test_map_originmag():
 
     cinfo = qmlm.get('creationInfo', {})
     assert cinfo.get('agencyID') == "QQ"
-    assert cinfo.get('author') == "BRTT:tom"
+    assert cinfo.get('author') == "tom"
 
     # Case of no netmag UID
     csso2 = dict(csso)
