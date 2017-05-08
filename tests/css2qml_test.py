@@ -39,11 +39,11 @@ my_etype_map = {
 
 # TODO: Init converter, rid_factory in a setup/teardown
 CONV = Converter(
-    agency = my_agency_code,
-    rid_factory = ResourceURIGenerator("quakeml", my_authority_id),
-    utc_factory = timestamp2isostr,
-    etype_map = my_etype_map,
-    automatic_authors = ['orbassoc', 'orbmag'],
+    agency=my_agency_code,
+    rid_factory=ResourceURIGenerator("quakeml", my_authority_id),
+    utc_factory=timestamp2isostr,
+    etype_map=my_etype_map,
+    automatic_authors=['orbassoc', 'orbmag'],
 )
 
 
@@ -89,7 +89,7 @@ def test_map_origin():
 
     cinfo = qmlo.get('creationInfo', {})
     assert cinfo.get('agencyID') == "QQ"
-    assert cinfo.get('author') == "BRTT:tom"
+    assert cinfo.get('author') == "tom"
     # May not be string
     # assert cinfo.get('version') == "1371545"
     # Check time format against regex? or within X min of test time?

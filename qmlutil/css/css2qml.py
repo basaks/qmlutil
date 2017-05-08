@@ -334,7 +334,7 @@ class CSSToQMLConverter(Root):
                                      db.get('vmodel') or model or uuid.uuid4())
 
         mode, status = self.get_event_status(author)
-        agency if agency is not '' else self.agency
+        agency = self.agency if self.agency else agency
         origin_rid = "{0}/{1}".format('origin',
                                       db.get('orid') or uuid.uuid4())
 
