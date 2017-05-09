@@ -41,6 +41,11 @@ Require other python libs
 
 Dependencies
 ------------
+
+We use `obspy` to convert `quakeml` to `seiscomp3ml`. `obspy` has the 
+following system level requirements:
+ ```sudo apt-get install libxml2-dev libxslt1-dev```
+
 There are no deps for core. The `plugins` modules have various vendor reqs:
 * The `antelope_db` plugin requires the proprietary `antelope` packages and NSL's `curds2` DBAPI driver
 * The `xml` plugin requires the `lxml` package

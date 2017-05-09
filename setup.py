@@ -19,6 +19,7 @@ setup.py for qmlutil
 
 - Mark Williams, Nevada Seismological Laboratory
 - University of Nevada, Reno, (2015)
+- Sudipta Basak, Geoscience Australia (2017)
 
 """
 from setuptools import setup
@@ -26,10 +27,35 @@ from setuptools import setup
 s_args = {
     'name': 'qmlutil',
     'version': '0.5.0',
-    'description': 'QuakeML utils for python',
-    'author': 'Mark Williams',
-    'maintainer': 'Nevada Seismological Laboratory',
-    'url': 'https//github.com/NVSeismoLab/qmlutil',
+    'description': 'QuakeML/Seiscomp3ML utils for python',
+    'author': 'Mark Williams, Sudipta Basak',
+    'maintainer': 'started by Nevada Seismological Laboratory, '
+                  'Now manintained by Geoscience Australia',
+    'url': 'https//github.com/basaks/qmlutil',
+    'setup_requires': ['numpy >= 1.9.2', 'Cython'],  # required due to scipy
+    'install_requires': [
+        'scipy >= 0.15.1',
+        'matplotlib >= 1.5.1',
+        'obspy'
+    ],
+    'dependency_links': [
+        'https://github.com/obspy/obspy/archive/'
+        'master.zip#egg={package}'.format(package='obspy')
+      ],
+    'extras_require': {
+        'demos': [
+            'matplotlib'
+        ],
+        'kmz': [
+            'simplekml',
+            'pillow'
+        ],
+        'dev': [
+            'sphinx',
+            'ghp-import',
+            'sphinxcontrib-programoutput'
+        ]
+    },
     'packages': [
         'qmlutil',
         'qmlutil.plugins',
@@ -38,6 +64,7 @@ s_args = {
         'qmlutil.lib',
         'qmlutil.ichinose',
     ],
+    'package_dir': {'qmlutil': 'qmlutil'},
     'package_data': {
         'qmlutil' : [
             'data/*.rng',
@@ -47,4 +74,3 @@ s_args = {
 }
 
 setup(**s_args)
-
