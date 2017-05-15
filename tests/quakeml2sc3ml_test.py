@@ -13,9 +13,5 @@ except:
 def test_functionality(random_filename):
     catalog = read_events()
     sc3xml = random_filename(ext='.xml')
-    _write_sc3ml(catalog=catalog, filename=sc3xml)
+    catalog.write(filename=sc3xml, format='SC3ML')
     assert isfile(sc3xml)
-
-
-
-
